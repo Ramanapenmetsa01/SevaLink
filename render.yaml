@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: seva-link-backend
+    env: node
+    buildCommand: npm install
+    startCommand: node server/index.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+  - type: web
+    name: seva-link-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: client/build
+    plan: free
