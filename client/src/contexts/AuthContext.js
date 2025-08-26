@@ -4,7 +4,7 @@ import { toastSuccess } from '../utils/alerts';
 
 // Set axios baseURL dynamically based on environment
 axios.defaults.baseURL = process.env.NODE_ENV === 'production'
-  ? 'https://sevalink.onrender.com/api'
+  ? 'https://sevalink.onrender.com'
   : '/api';
 
 // Initial state
