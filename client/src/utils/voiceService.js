@@ -2,7 +2,7 @@ import axios from 'axios';
 
 class VoiceService {
   constructor() {
-    this.baseURL = '/api/chatbot';
+    this.baseURL = axios.defaults.baseURL;
     this.setupInterceptors();
   }
 

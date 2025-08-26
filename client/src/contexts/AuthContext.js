@@ -2,6 +2,11 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import axios from 'axios';
 import { toastSuccess } from '../utils/alerts';
 
+// Set axios baseURL dynamically based on environment
+axios.defaults.baseURL = process.env.NODE_ENV === 'production'
+  ? 'https://sevalink.onrender.com/api'
+  : '/api';
+
 // Initial state
 const initialState = {
   user: null,

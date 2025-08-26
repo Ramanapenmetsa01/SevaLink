@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { showError, showSuccess } from '../utils/alerts';
+import axios from 'axios';
 
 // Base URL (set in Vercel → Project → Settings → Environment Variables)
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+const BASE_URL = axios.defaults.baseURL;
 
-// Base API function
 const apiCall = async (url, options = {}) => {
   const token = localStorage.getItem('token');
   const defaultHeaders = {

@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../hooks/useAuth';
 import { StatsSkeleton } from '../components/ui/SkeletonLoader';
+import axios from 'axios';
 
 const VolunteerDashboardHome = () => {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ const VolunteerDashboardHome = () => {
   const fetchVolunteerDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/requests/volunteer/dashboard', {
+      const response = await fetch(`${axios.defaults.baseURL}/requests/volunteer/dashboard`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
