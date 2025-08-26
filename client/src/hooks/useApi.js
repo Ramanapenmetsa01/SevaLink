@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { showError, showSuccess } from '../utils/alerts';
 
+// Base URL (set in Vercel → Project → Settings → Environment Variables)
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
 // Base API function
 const apiCall = async (url, options = {}) => {
   const token = localStorage.getItem('token');
@@ -9,7 +12,7 @@ const apiCall = async (url, options = {}) => {
     ...(token && { 'Authorization': `Bearer ${token}` })
   };
 
-  const response = await fetch(url, {
+  const response = await fetch(`${BASE_URL}${url}`, {
     ...options,
     headers: {
       ...defaultHeaders,
@@ -39,8 +42,8 @@ export const useComplaints = (filters = {}, page = 1, limit = 12) => {
   return useQuery({
     queryKey: ['complaints', filters, page, limit],
     queryFn: () => apiCall(`/api/complaints?${queryParams}`),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    cacheTime: 10 * 60 * 1000,
   });
 };
 
@@ -66,7 +69,7 @@ export const usePublicBloodRequests = () => {
   return useQuery({
     queryKey: ['publicBloodRequests'],
     queryFn: () => apiCall('/api/requests/public/blood'),
-    staleTime: 2 * 60 * 1000, // 2 minutes for more frequent updates
+    staleTime: 2 * 60 * 1000,
     cacheTime: 5 * 60 * 1000,
   });
 };
