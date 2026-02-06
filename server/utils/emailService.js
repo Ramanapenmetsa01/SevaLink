@@ -367,7 +367,7 @@ const sendWelcomeEmail = async (email, name) => {
               </div>
               
               <div style="text-align: center; margin-top: 30px;">
-                <a href="http://localhost:3001/dashboard" class="cta-button">
+                <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/dashboard" class="cta-button">
                   Get Started Now
                 </a>
               </div>

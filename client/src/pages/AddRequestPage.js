@@ -13,6 +13,7 @@ import FormInput from '../components/ui/FormInput';
 import SimpleLocationSelector from '../components/ui/SimpleLocationSelector';
 import { showError, showSuccess, showLoading, closeLoading } from '../utils/alerts';
 import { useAuth } from '../contexts/AuthContext';
+import { API_CONFIG } from '../config/api';
 
 const AddRequestPage = () => {
   const [searchParams] = useSearchParams();
@@ -417,7 +418,7 @@ const AddRequestPage = () => {
       }
 
       // Submit to API
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://sevalink-ttbd.onrender.com'}/api/requests`, {
+      const response = await fetch(`${API_CONFIG.baseURL}/api/requests`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -525,11 +526,10 @@ const AddRequestPage = () => {
           <label className="block text-sm font-medium text-white mb-2">
             Contact Phone
           </label>
-          <div className={`border rounded-lg px-3 py-2 ${
-            user?.phone
+          <div className={`border rounded-lg px-3 py-2 ${user?.phone
               ? 'bg-white/10 border-white/30 text-gray-300'
               : 'bg-red-500/20 border-red-400 text-red-300'
-          }`}>
+            }`}>
             {user?.phone || 'No phone number in account - Please update your profile'}
           </div>
           <p className="text-xs mt-1">

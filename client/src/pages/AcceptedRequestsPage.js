@@ -11,6 +11,7 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { showError } from '../utils/alerts';
+import { API_CONFIG } from '../config/api';
 
 const AcceptedRequestsPage = () => {
   const [acceptedRequests, setAcceptedRequests] = useState([]);
@@ -25,7 +26,7 @@ const AcceptedRequestsPage = () => {
   const fetchAcceptedRequests = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://sevalink-ttbd.onrender.com'}/api/requests/accepted`, {
+      const response = await fetch(`${API_CONFIG.baseURL}/api/requests/accepted`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -251,7 +252,7 @@ const AcceptedRequestsPage = () => {
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-white mb-4">Request Information</h3>
-                    
+
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-gray-300">Blood Type:</span>
@@ -290,8 +291,8 @@ const AcceptedRequestsPage = () => {
                         <span className="text-gray-300 block mb-2">Location:</span>
                         <div className="bg-white/10 rounded-lg p-3">
                           <p className="text-white text-sm">
-                            {typeof selectedRequest.location === 'object' 
-                              ? selectedRequest.location.address 
+                            {typeof selectedRequest.location === 'object'
+                              ? selectedRequest.location.address
                               : selectedRequest.location}
                           </p>
                         </div>
@@ -314,7 +315,7 @@ const AcceptedRequestsPage = () => {
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-white mb-4">Your Volunteer Status</h3>
-                    
+
                     <div className="space-y-4">
                       <div className="bg-green-500/20 border border-green-400/50 rounded-lg p-4">
                         <div className="flex items-center space-x-2 mb-2">
@@ -322,7 +323,7 @@ const AcceptedRequestsPage = () => {
                           <span className="text-green-400 font-medium">Volunteer Confirmed</span>
                         </div>
                         <p className="text-gray-300 text-sm">
-                          You have volunteered to help with this blood donation request. 
+                          You have volunteered to help with this blood donation request.
                           Please coordinate with the requester to complete the donation.
                         </p>
                       </div>

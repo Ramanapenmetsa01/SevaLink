@@ -11,6 +11,7 @@ import {
   EnvelopeIcon
 } from '@heroicons/react/24/outline';
 import { showError } from '../utils/alerts';
+import { API_CONFIG } from '../config/api';
 
 const AcceptedBloodRequestsPage = () => {
   const [acceptedRequests, setAcceptedRequests] = useState([]);
@@ -25,7 +26,7 @@ const AcceptedBloodRequestsPage = () => {
   const fetchAcceptedBloodRequests = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://sevalink-ttbd.onrender.com'}/api/requests/blood/accepted`, {
+      const response = await fetch(`${API_CONFIG.baseURL}/api/requests/blood/accepted`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -136,11 +137,10 @@ const AcceptedBloodRequestsPage = () => {
               >
                 {/* Role Badge and Blood Type */}
                 <div className="flex justify-between items-start mb-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    request.userRole === 'requester' 
-                      ? 'bg-blue-500/20 text-blue-400' 
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${request.userRole === 'requester'
+                      ? 'bg-blue-500/20 text-blue-400'
                       : 'bg-green-500/20 text-green-400'
-                  }`}>
+                    }`}>
                     {request.userRole === 'requester' ? 'YOUR REQUEST' : 'YOU DONATED'}
                   </span>
                   <span className={`px-3 py-1 rounded-full text-sm font-bold ${getBloodTypeColor(request.bloodType)}`}>
@@ -233,7 +233,7 @@ const AcceptedBloodRequestsPage = () => {
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-white mb-4">Request Information</h3>
-                    
+
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-gray-300">Blood Type:</span>
@@ -265,8 +265,8 @@ const AcceptedBloodRequestsPage = () => {
                         <span className="text-gray-300 block mb-2">Location:</span>
                         <div className="bg-white/10 rounded-lg p-3">
                           <p className="text-white text-sm">
-                            {typeof selectedRequest.location === 'object' 
-                              ? selectedRequest.location.address 
+                            {typeof selectedRequest.location === 'object'
+                              ? selectedRequest.location.address
                               : selectedRequest.location}
                           </p>
                         </div>
@@ -281,14 +281,14 @@ const AcceptedBloodRequestsPage = () => {
                     <h3 className="text-lg font-semibold text-white mb-4">
                       {selectedRequest.userRole === 'requester' ? 'Donor Contact' : 'Requester Contact'}
                     </h3>
-                    
+
                     <div className="bg-green-500/20 border border-green-400/50 rounded-lg p-4 mb-6">
                       <div className="flex items-center space-x-2 mb-2">
                         <CheckCircleIcon className="w-5 h-5 text-green-400" />
                         <span className="text-green-400 font-medium">Successfully Matched!</span>
                       </div>
                       <p className="text-gray-300 text-sm">
-                        {selectedRequest.userRole === 'requester' 
+                        {selectedRequest.userRole === 'requester'
                           ? 'A donor has volunteered to help. Contact them to coordinate the donation.'
                           : 'You have volunteered to help. Contact the requester to coordinate the donation.'}
                       </p>
@@ -301,39 +301,39 @@ const AcceptedBloodRequestsPage = () => {
                           <div className="flex items-center justify-between">
                             <span className="text-gray-300">Name:</span>
                             <span className="text-white font-medium">
-                              {selectedRequest.userRole === 'requester' 
-                                ? selectedRequest.donor?.name 
+                              {selectedRequest.userRole === 'requester'
+                                ? selectedRequest.donor?.name
                                 : selectedRequest.requester.name}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-gray-300">Phone:</span>
-                            <a 
-                              href={`tel:${selectedRequest.userRole === 'requester' 
-                                ? selectedRequest.donor?.phone 
+                            <a
+                              href={`tel:${selectedRequest.userRole === 'requester'
+                                ? selectedRequest.donor?.phone
                                 : selectedRequest.requester.phone}`}
                               className="text-blue-400 hover:text-blue-300 font-medium flex items-center space-x-1"
                             >
                               <PhoneIcon className="w-4 h-4" />
                               <span>
-                                {selectedRequest.userRole === 'requester' 
-                                  ? selectedRequest.donor?.phone 
+                                {selectedRequest.userRole === 'requester'
+                                  ? selectedRequest.donor?.phone
                                   : selectedRequest.requester.phone}
                               </span>
                             </a>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-gray-300">Email:</span>
-                            <a 
-                              href={`mailto:${selectedRequest.userRole === 'requester' 
-                                ? selectedRequest.donor?.email 
+                            <a
+                              href={`mailto:${selectedRequest.userRole === 'requester'
+                                ? selectedRequest.donor?.email
                                 : selectedRequest.requester.email}`}
                               className="text-blue-400 hover:text-blue-300 font-medium flex items-center space-x-1"
                             >
                               <EnvelopeIcon className="w-4 h-4" />
                               <span className="truncate">
-                                {selectedRequest.userRole === 'requester' 
-                                  ? selectedRequest.donor?.email 
+                                {selectedRequest.userRole === 'requester'
+                                  ? selectedRequest.donor?.email
                                   : selectedRequest.requester.email}
                               </span>
                             </a>

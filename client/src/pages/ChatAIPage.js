@@ -13,6 +13,7 @@ import VoiceRecorder from '../components/chatbot/VoiceRecorder';
 import voiceService from '../utils/voiceService';
 import toast from 'react-hot-toast';
 import { AuthContext } from '../contexts/AuthContext';
+import { API_CONFIG } from '../config/api';
 
 const ChatAIPage = () => {
   const { user, isAuthenticated } = useContext(AuthContext);
@@ -35,7 +36,7 @@ const ChatAIPage = () => {
 
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/chatbot/history', {
+        const response = await fetch(`${API_CONFIG.baseURL}/api/chatbot/history`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

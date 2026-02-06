@@ -11,6 +11,7 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { showError, showSuccess, showLoading, closeLoading } from '../utils/alerts';
+import { API_CONFIG } from '../config/api';
 
 const PublicRequestsPage = () => {
   const [requests, setRequests] = useState([]);
@@ -26,7 +27,7 @@ const PublicRequestsPage = () => {
 
   const fetchAcceptedRequests = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://sevalink-ttbd.onrender.com'}/api/requests/accepted`, {
+      const response = await fetch(`${API_CONFIG.baseURL}/api/requests/accepted`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -45,7 +46,7 @@ const PublicRequestsPage = () => {
   const fetchPublicRequests = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://sevalink-ttbd.onrender.com'}/api/requests/public/blood`, {
+      const response = await fetch(`${API_CONFIG.baseURL}/api/requests/public/blood`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -69,8 +70,8 @@ const PublicRequestsPage = () => {
   const handleVolunteer = async (requestId) => {
     try {
       showLoading('Volunteering to help...');
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://sevalink-ttbd.onrender.com'}/api/requests/${requestId}/volunteer`, {
+
+      const response = await fetch(`${API_CONFIG.baseURL}/api/requests/${requestId}/volunteer`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -233,11 +234,10 @@ const PublicRequestsPage = () => {
                     e.stopPropagation();
                     openRequestModal(request);
                   }}
-                  className={`w-full mt-4 py-2 rounded-lg transition-all duration-300 font-medium ${
-                    acceptedRequests.has(request._id)
+                  className={`w-full mt-4 py-2 rounded-lg transition-all duration-300 font-medium ${acceptedRequests.has(request._id)
                       ? 'bg-gradient-to-r from-green-500 to-blue-500 text-white hover:from-green-600 hover:to-blue-600'
                       : 'bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600'
-                  }`}
+                    }`}
                 >
                   {acceptedRequests.has(request._id) ? 'View Requester Details' : 'View Details & Help'}
                 </button>
@@ -281,7 +281,7 @@ const PublicRequestsPage = () => {
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-white mb-4">Request Information</h3>
-                    
+
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-gray-300">Blood Type:</span>
@@ -315,8 +315,8 @@ const PublicRequestsPage = () => {
                         <span className="text-gray-300 block mb-2">Location:</span>
                         <div className="bg-white/10 rounded-lg p-3">
                           <p className="text-white text-sm">
-                            {typeof selectedRequest.location === 'object' 
-                              ? selectedRequest.location.address 
+                            {typeof selectedRequest.location === 'object'
+                              ? selectedRequest.location.address
                               : selectedRequest.location}
                           </p>
                         </div>
