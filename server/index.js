@@ -57,6 +57,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
+app.get("/", (req, res) => {
+  res.status(200).send("OK");
+});
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/requests', require('./routes/requests'));
 app.use('/api/complaints', require('./routes/complaints'));
