@@ -14,14 +14,10 @@ class VoiceService {
         const token = localStorage.getItem('token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('VoiceService: Adding token to request:', config.url);
-        } else {
-          console.warn('VoiceService: No token found for request:', config.url);
         }
         return config;
       },
       (error) => {
-        console.error('VoiceService: Request interceptor error:', error);
         return Promise.reject(error);
       }
     );
@@ -29,15 +25,11 @@ class VoiceService {
     // Response interceptor for error handling
     axios.interceptors.response.use(
       (response) => {
-        console.log('VoiceService: Successful response from:', response.config.url);
         return response;
       },
       (error) => {
-        console.error('VoiceService: Response error:', error.response?.status, error.response?.data);
-
         // Don't automatically handle auth errors here - let the calling component decide
         if (error.response?.status === 401) {
-          console.warn('VoiceService: Authentication failed - token may be invalid');
           // Add a flag to indicate this is an auth error
           error.isAuthError = true;
         }
@@ -62,28 +54,15 @@ class VoiceService {
       // Ensure we have a valid token
       const token = localStorage.getItem('token');
       if (!token) {
-        console.error('VoiceService: No token found in localStorage');
         throw new Error('Authentication required - no token found');
       }
-
-      console.log('VoiceService: Uploading audio with token:', token.substring(0, 20) + '...');
-      console.log('VoiceService: FormData contents:', Array.from(formData.entries()));
-
-      // Note: We're using Web Speech API for transcription and backend for text processing
-      console.log('VoiceService: Using hybrid approach - Web Speech API + Backend text processing');
 
       const response = await axios.post(`${this.baseURL}/voice`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`, // Explicitly set token
         },
-        timeout: 60000, // 60 seconds timeout for audio processing
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          console.log(`VoiceService: Upload Progress: ${percentCompleted}%`);
-        }
+        timeout: 60000 // 60 seconds timeout for audio processing
       });
 
       return {
@@ -93,8 +72,6 @@ class VoiceService {
       };
 
     } catch (error) {
-      console.error('Audio upload error:', error);
-
       let errorMessage = 'Failed to process audio';
       let errorType = 'GENERAL_ERROR';
 
@@ -139,24 +116,21 @@ class VoiceService {
    * Send text message (manual input)
    * @param {string} message - Text message
    * @param {string} language - Language code
+   * @param {Object} conversationContext - Context from previous conversation
    * @returns {Promise<Object>} Processing result
    */
-  async sendTextMessage(message, language = 'en') {
+  async sendTextMessage(message, language = 'en', conversationContext = {}) {
     try {
       // Ensure we have a valid token
       const token = localStorage.getItem('token');
       if (!token) {
-        console.error('VoiceService: No token found for text message');
         throw new Error('Authentication required - no token found');
       }
 
-      console.log('VoiceService: Sending text message:', message);
-      console.log('VoiceService: Using token:', token.substring(0, 20) + '...');
-      console.log('VoiceService: Language:', language);
-
       const response = await axios.post(`${this.baseURL}/text`, {
         message,
-        language
+        language,
+        conversationContext
       }, {
         headers: {
           'Authorization': `Bearer ${token}`, // Explicitly set token
@@ -170,8 +144,6 @@ class VoiceService {
       };
 
     } catch (error) {
-      console.error('Text message error:', error);
-      
       return {
         success: false,
         error: error.response?.data?.message || 'Failed to process text message',
@@ -198,8 +170,6 @@ class VoiceService {
       };
 
     } catch (error) {
-      console.error('Error fetching voice requests:', error);
-      
       return {
         success: false,
         error: error.response?.data?.message || 'Failed to fetch voice requests',
@@ -223,8 +193,6 @@ class VoiceService {
       };
 
     } catch (error) {
-      console.error('Error fetching voice request:', error);
-      
       return {
         success: false,
         error: error.response?.data?.message || 'Failed to fetch voice request',
@@ -338,8 +306,6 @@ class VoiceService {
           alternatives.sort((a, b) => b.confidence - a.confidence);
           let bestResult = alternatives[0];
 
-          console.log('VoiceService: Speech recognition results:', alternatives);
-
           // Apply post-processing for better accuracy
           bestResult.transcript = this.postProcessTranscript(bestResult.transcript, language);
 
@@ -359,8 +325,6 @@ class VoiceService {
         };
 
         recognition.onerror = (event) => {
-          console.error('VoiceService: Speech recognition error:', event.error);
-
           let errorMessage = 'Speech recognition failed';
           switch (event.error) {
             case 'no-speech':
@@ -390,14 +354,13 @@ class VoiceService {
         };
 
         recognition.onend = () => {
-          console.log('VoiceService: Speech recognition ended');
+          // Recognition ended
         };
 
         // Start recognition
         recognition.start();
 
       } catch (error) {
-        console.error('VoiceService: Web Speech API error:', error);
         resolve({
           success: false,
           error: error.message,
@@ -501,8 +464,6 @@ class VoiceService {
    */
   async translateText(text, fromLang, toLang) {
     try {
-      console.log('VoiceService: Translating text:', text, 'from', fromLang, 'to', toLang);
-
       const response = await axios.post(`${this.baseURL}/translate`, {
         text,
         fromLang,
@@ -516,8 +477,6 @@ class VoiceService {
       };
 
     } catch (error) {
-      console.error('Translation error:', error);
-
       let errorMessage = 'Translation failed';
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
@@ -540,8 +499,6 @@ class VoiceService {
    */
   async detectLanguage(text) {
     try {
-      console.log('VoiceService: Detecting language for text:', text);
-
       const response = await axios.post(`${this.baseURL}/detect-language`, {
         text
       });
@@ -553,8 +510,6 @@ class VoiceService {
       };
 
     } catch (error) {
-      console.error('Language detection error:', error);
-
       let errorMessage = 'Language detection failed';
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;

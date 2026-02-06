@@ -10,12 +10,12 @@ const User = require('../models/User');
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
-    const { 
-      type, 
-      status, 
+    const {
+      type,
+      status,
       sortBy = 'newest',
-      page = 1, 
-      limit = 10 
+      page = 1,
+      limit = 10
     } = req.query;
 
     let query = { user: req.user.userId };
@@ -280,20 +280,20 @@ router.get('/volunteer/dashboard', auth, async (req, res) => {
     const recentRequests = await Request.find({
       'accepters.user': req.user.userId
     })
-    .sort({ 'accepters.acceptedAt': -1 })
-    .limit(5)
-    .populate('user', 'name email')
-    .select('title description type status createdAt location dueDate');
+      .sort({ 'accepters.acceptedAt': -1 })
+      .limit(5)
+      .populate('user', 'name email')
+      .select('title description type status createdAt location dueDate');
 
     // Get volunteer's own blood requests (like in user dashboard)
     const myBloodRequests = await Request.find({
       user: req.user.userId,
       type: 'blood'
     })
-    .sort({ createdAt: -1 })
-    .limit(5)
-    .populate('accepters.user', 'name email phone')
-    .select('bloodType urgencyLevel status createdAt location accepters');
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('accepters.user', 'name email phone')
+      .select('bloodType urgencyLevel status createdAt location accepters');
 
     // Get volunteer info from user
     const User = require('../models/User');
@@ -330,11 +330,10 @@ router.get('/accepted', auth, async (req, res) => {
     const requests = await Request.find({
       'accepters.user': req.user.userId
     })
-    .populate('user', 'name email')
-    .populate('accepters.user', 'name email phone')
-    .sort({ 'accepters.acceptedAt': -1 });
+      .populate('user', 'name email')
+      .populate('accepters.user', 'name email phone')
+      .sort({ 'accepters.acceptedAt': -1 });
 
-    console.log(`Found ${requests.length} accepted requests for user ${req.user.userId}`);
 
     // Filter to only show the user's acceptance details
     const acceptedRequests = requests.map(request => {
@@ -400,9 +399,9 @@ router.get('/blood/accepted', auth, async (req, res) => {
         { 'accepters.user': req.user.userId } // User is the accepter
       ]
     })
-    .populate('user', 'name phone email')
-    .populate('accepters.user', 'name phone email')
-    .sort({ updatedAt: -1 });
+      .populate('user', 'name phone email')
+      .populate('accepters.user', 'name phone email')
+      .sort({ updatedAt: -1 });
 
     const acceptedRequests = requests.map(request => {
       const isRequester = request.user._id.toString() === req.user.userId.toString();
@@ -546,9 +545,9 @@ router.get('/public/blood', auth, async (req, res) => {
         { accepters: { $size: 0 } } // Empty accepters array
       ]
     })
-    .populate('user', 'name')
-    .sort({ createdAt: -1 })
-    .limit(50);
+      .populate('user', 'name')
+      .sort({ createdAt: -1 })
+      .limit(50);
 
     res.json({
       success: true,
@@ -623,7 +622,7 @@ router.get('/:id', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
   try {
     const request = await Request.findById(req.params.id);
-    
+
     if (!request) {
       return res.status(404).json({
         message: 'Request not found'
@@ -693,7 +692,7 @@ router.put('/:id', auth, async (req, res) => {
 router.delete('/:id', auth, async (req, res) => {
   try {
     const request = await Request.findById(req.params.id);
-    
+
     if (!request) {
       return res.status(404).json({
         message: 'Request not found'

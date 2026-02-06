@@ -30,7 +30,7 @@ const VoiceRecorder = ({ onSendAudio, onTranscriptionReceived, disabled = false 
 
       // Stop any previous recognition to avoid 'aborted'
       if (window.currentRecognition) {
-        try { window.currentRecognition.stop(); } catch (_) {}
+        try { window.currentRecognition.stop(); } catch (_) { }
         window.currentRecognition = null;
       }
 
@@ -375,12 +375,10 @@ const VoiceRecorder = ({ onSendAudio, onTranscriptionReceived, disabled = false 
     setRecordingStartTime(null);
     setLiveTranscription('');
     clearBlobUrl();
-    console.log('Recording cleared');
   };
 
   // LIVE VOICE TRANSCRIPTION - Click to speak
   const handleLiveVoiceInput = async () => {
-    console.log('🎤 VoiceRecorder: Starting LIVE voice input...');
 
     setIsProcessing(true);
     setError(null);
@@ -393,7 +391,6 @@ const VoiceRecorder = ({ onSendAudio, onTranscriptionReceived, disabled = false 
         return;
       }
 
-      console.log('✅ VoiceRecorder: Starting live speech recognition...');
 
       // Start live speech recognition
       const transcribedText = await startLiveSpeechRecognition();
@@ -402,7 +399,6 @@ const VoiceRecorder = ({ onSendAudio, onTranscriptionReceived, disabled = false 
         throw new Error('No speech detected. Please speak clearly and try again.');
       }
 
-      console.log('🎤 VoiceRecorder: Live transcription:', transcribedText);
 
       // Show as draft with Send/Delete options instead of auto-sending
       setDraftTranscript(transcribedText.trim());
@@ -446,7 +442,6 @@ const VoiceRecorder = ({ onSendAudio, onTranscriptionReceived, disabled = false 
       setError(userErrorMessage);
 
       // Don't clear the recording on error so user can try again
-      console.log('❌ VoiceRecorder: Keeping recording for retry');
     } finally {
       setIsProcessing(false);
     }
@@ -455,7 +450,6 @@ const VoiceRecorder = ({ onSendAudio, onTranscriptionReceived, disabled = false 
   // Fallback function using Web Speech API when server fails
   const tryWebSpeechFallback = async () => {
     try {
-      console.log('VoiceRecorder: Attempting Web Speech API fallback...');
 
       // Since Web Speech API works with live microphone, not recorded audio,
       // we'll provide a mock transcription for now
@@ -566,9 +560,8 @@ const VoiceRecorder = ({ onSendAudio, onTranscriptionReceived, disabled = false 
               {[...Array(5)].map((_, i) => (
                 <div
                   key={i}
-                  className={`w-1 h-3 rounded-full transition-colors duration-300 ${
-                    recordingTime > i * 2 ? 'bg-red-500' : 'bg-gray-600'
-                  }`}
+                  className={`w-1 h-3 rounded-full transition-colors duration-300 ${recordingTime > i * 2 ? 'bg-red-500' : 'bg-gray-600'
+                    }`}
                   style={{
                     animation: recordingTime > i * 2 ? `bounce 0.6s ease-in-out infinite ${i * 0.1}s` : 'none'
                   }}

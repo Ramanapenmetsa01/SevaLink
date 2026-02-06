@@ -28,6 +28,7 @@ const ChatBot = () => {
   ]);
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [conversationContext, setConversationContext] = useState({});
 
   // Text-to-Speech function
   const speakText = (text, language = 'en') => {
@@ -141,21 +142,47 @@ const ChatBot = () => {
 
       // Send text message to backend
       try {
-        const result = await voiceService.sendTextMessage(userMessage.text);
-        console.log('Backend response:', result); // Debug log
+        const result = await voiceService.sendTextMessage(userMessage.text, 'en', conversationContext);
 
         if (result.success) {
+          // Update conversation context with extracted info
+          if (result.data.extractedInfo) {
+            setConversationContext(result.data.extractedInfo);
+          }
+          
+          let botResponseText = '';
+          
+          // If needs more info, show the follow-up question
+          if (result.data.needsMoreInfo) {
+            botResponseText = result.data.geminiResponse;
+          } else if (result.data.createdRequestId) {
+            // Request was created successfully
+            botResponseText = result.data.geminiResponse;
+            // Clear conversation context after successful request creation
+            setConversationContext({});
+          } else {
+            // General inquiry
+            botResponseText = result.data.geminiResponse || `Thank you for your message!`;
+          }
+
           const botResponse = {
             id: Date.now() + 1,
-            text: `Thank you for your message! I've received your ${result.data.category} request with ${result.data.priority} priority. Your request has been saved and will be reviewed by our volunteers soon.`,
+            text: botResponseText,
             sender: 'bot',
             timestamp: new Date(),
-            type: 'response',
+            type: result.data.createdRequestId ? 'success' : (result.data.needsMoreInfo ? 'question' : 'response'),
             data: result.data
           };
 
           setMessages(prev => [...prev, botResponse]);
-          toast.success('Message sent successfully!');
+          
+          if (result.data.createdRequestId) {
+            toast.success('Request created successfully!');
+          } else if (result.data.needsMoreInfo) {
+            toast.info('Please provide more details');
+          } else {
+            toast.success('Message processed!');
+          }
         } else {
           throw new Error(result.error);
         }

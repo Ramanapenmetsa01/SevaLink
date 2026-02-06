@@ -78,157 +78,137 @@ router.post('/voice',
   handleValidationErrors,
   voiceRateLimit,
   async (req, res) => {
-  try {
-    console.log('🎤 Voice route: Received voice processing request');
-    console.log('🎤 Voice route: User:', req.user?.email);
-    console.log('🎤 Voice route: Request body:', req.body);
-    console.log('🎤 Voice route: File info:', req.file ? {
-      fieldname: req.file.fieldname,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size
-    } : 'No file');
-
-    const { language = 'auto' } = req.body;
-    const audioFile = req.file;
-
-    if (!audioFile) {
-      console.log('❌ Voice route: No audio file provided');
-      return res.status(400).json({
-        success: false,
-        message: 'Audio file is required'
-      });
-    }
-
-    console.log('Voice route: Processing audio file...');
-    console.log('Voice route: File size:', audioFile.size);
-    console.log('Voice route: File type:', audioFile.mimetype);
-    console.log('Voice route: Language:', language);
-
-    // Try Whisper service for transcription, with fallback
-    let transcriptionResult;
-    let transcribedText;
-
     try {
-      const whisperService = require('../utils/whisperService');
-      transcriptionResult = await whisperService.transcribeAudio(audioFile.buffer, {
-        language: language === 'auto' ? 'auto' : language
-      });
 
-      if (transcriptionResult.success) {
-        transcribedText = transcriptionResult.text;
 
-        // Detect language from actual transcribed text if not already detected
-        if (!transcriptionResult.language || transcriptionResult.language === 'auto') {
-          transcriptionResult.language = detectLanguageFromText(transcribedText);
-        }
+      const { language = 'auto' } = req.body;
+      const audioFile = req.file;
 
-        console.log('Voice route: Whisper transcribed text:', transcribedText);
-        console.log('Voice route: Detected language:', transcriptionResult.language);
-      } else {
-        throw new Error(transcriptionResult.error || 'Whisper transcription failed');
+      if (!audioFile) {
+        return res.status(400).json({
+          success: false,
+          message: 'Audio file is required'
+        });
       }
-    } catch (whisperError) {
-      console.log('Voice route: Whisper failed, using mock transcription:', whisperError.message);
 
-      // Fallback to mock transcription based on language - use realistic examples
-      const mockTranscriptions = {
-        'en': 'I need O positive blood urgently',
-        'hi': 'मुझे ओ पॉजिटिव खून की तुरंत जरूरत है',
-        'te': 'నాకు ఓ పాజిటివ్ రక్తం అత్యవసరంగా కావాలి',
-        'auto': 'I need O positive blood urgently'
-      };
+      // Try Whisper service for transcription, with fallback
+      let transcriptionResult;
+      let transcribedText;
 
-      transcribedText = mockTranscriptions[language] || mockTranscriptions['en'];
-      // Detect language from the transcribed text
-      const detectedLanguage = detectLanguageFromText(transcribedText);
+      try {
+        const whisperService = require('../utils/whisperService');
+        transcriptionResult = await whisperService.transcribeAudio(audioFile.buffer, {
+          language: language === 'auto' ? 'auto' : language
+        });
 
-      transcriptionResult = {
-        success: true,
-        text: transcribedText,
-        language: detectedLanguage,
-        confidence: 0.8,
-        method: 'mock_server_fallback'
-      };
+        if (transcriptionResult.success) {
+          transcribedText = transcriptionResult.text;
 
-      console.log('Voice route: Using mock transcription:', transcribedText);
-    }
+          // Detect language from actual transcribed text if not already detected
+          if (!transcriptionResult.language || transcriptionResult.language === 'auto') {
+            transcriptionResult.language = detectLanguageFromText(transcribedText);
+          }
 
-    // Process with Gemini Pro
-    const geminiResult = await geminiVoiceService.processTextWithGemini(transcribedText, {
-      language: transcriptionResult.language || language,
-      inputMethod: 'voice',
-      userType: 'citizen'
-    });
 
-    if (geminiResult.success) {
-      const responseData = {
-        id: Date.now().toString(),
-        transcribedText: transcribedText,
-        category: geminiResult.category,
-        priority: geminiResult.priority,
-        geminiResponse: geminiResult.response,
-        detectedLanguage: transcriptionResult.language || language,
-        confidence: transcriptionResult.confidence || 0.95,
-        processedAt: new Date(),
-        needsVoiceResponse: true,
-        voiceResponse: geminiVoiceService.prepareVoiceResponse(geminiResult.response, transcriptionResult.language || language),
-        usingFallback: geminiResult.usingFallback || false,
-        method: transcriptionResult.method || 'whisper'
-      };
-
-      res.json({
-        success: true,
-        message: geminiResult.usingFallback ? 'Voice request processed (fallback mode)' : 'Voice request processed with AI assistance',
-        data: responseData
-      });
-
-      // Save to database asynchronously
-      setImmediate(async () => {
-        try {
-          const voiceRequest = new VoiceRequest({
-            userId: req.user.id,
-            originalAudio: {
-              filename: audioFile.originalname,
-              mimetype: audioFile.mimetype,
-              size: audioFile.size
-            },
-            transcribedText: transcribedText,
-            detectedLanguage: transcriptionResult.language || language,
-            confidence: transcriptionResult.confidence || 0.95,
-            category: geminiResult.category,
-            priority: geminiResult.priority,
-            geminiResponse: geminiResult.response,
-            processingTime: Date.now() - Date.now(),
-            method: transcriptionResult.method || 'whisper'
-          });
-
-          await voiceRequest.save();
-          console.log('Voice request saved to database');
-        } catch (dbError) {
-          console.error('Error saving voice request to database:', dbError);
+        } else {
+          throw new Error(transcriptionResult.error || 'Whisper transcription failed');
         }
+      } catch (whisperError) {
+
+        // Fallback to mock transcription based on language - use realistic examples
+        const mockTranscriptions = {
+          'en': 'I need O positive blood urgently',
+          'hi': 'मुझे ओ पॉजिटिव खून की तुरंत जरूरत है',
+          'te': 'నాకు ఓ పాజిటివ్ రక్తం అత్యవసరంగా కావాలి',
+          'auto': 'I need O positive blood urgently'
+        };
+
+        transcribedText = mockTranscriptions[language] || mockTranscriptions['en'];
+        // Detect language from the transcribed text
+        const detectedLanguage = detectLanguageFromText(transcribedText);
+
+        transcriptionResult = {
+          success: true,
+          text: transcribedText,
+          language: detectedLanguage,
+          confidence: 0.8,
+          method: 'mock_server_fallback'
+        };
+
+      }
+
+      // Process with Gemini Pro
+      const geminiResult = await geminiVoiceService.processTextWithGemini(transcribedText, {
+        language: transcriptionResult.language || language,
+        inputMethod: 'voice',
+        userType: 'citizen'
       });
 
-    } else {
-      throw new Error(geminiResult.error || 'Failed to process with Gemini');
-    }
+      if (geminiResult.success) {
+        const responseData = {
+          id: Date.now().toString(),
+          transcribedText: transcribedText,
+          category: geminiResult.category,
+          priority: geminiResult.priority,
+          geminiResponse: geminiResult.response,
+          detectedLanguage: transcriptionResult.language || language,
+          confidence: transcriptionResult.confidence || 0.95,
+          processedAt: new Date(),
+          needsVoiceResponse: true,
+          voiceResponse: geminiVoiceService.prepareVoiceResponse(geminiResult.response, transcriptionResult.language || language),
+          usingFallback: geminiResult.usingFallback || false,
+          method: transcriptionResult.method || 'whisper'
+        };
 
-  } catch (error) {
-    console.error('Voice processing error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error processing voice request',
-      error: error.message
-    });
-  }
-}, voiceErrorHandler);
+        res.json({
+          success: true,
+          message: geminiResult.usingFallback ? 'Voice request processed (fallback mode)' : 'Voice request processed with AI assistance',
+          data: responseData
+        });
+
+        // Save to database asynchronously
+        setImmediate(async () => {
+          try {
+            const voiceRequest = new VoiceRequest({
+              userId: req.user.id,
+              originalAudio: {
+                filename: audioFile.originalname,
+                mimetype: audioFile.mimetype,
+                size: audioFile.size
+              },
+              transcribedText: transcribedText,
+              detectedLanguage: transcriptionResult.language || language,
+              confidence: transcriptionResult.confidence || 0.95,
+              category: geminiResult.category,
+              priority: geminiResult.priority,
+              geminiResponse: geminiResult.response,
+              processingTime: Date.now() - Date.now(),
+              method: transcriptionResult.method || 'whisper'
+            });
+
+            await voiceRequest.save();
+          } catch (dbError) {
+          }
+        });
+
+      } else {
+        throw new Error(geminiResult.error || 'Failed to process with Gemini');
+      }
+
+    } catch (error) {
+      console.error('Voice processing error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error processing voice request',
+        error: error.message
+      });
+    }
+  }, voiceErrorHandler);
 
 // @route   GET /api/chatbot/health
 // @desc    Health check endpoint
 // @access  Public
 router.get('/health', (req, res) => {
-  console.log('🏥 Health check endpoint called');
   res.json({
     success: true,
     message: 'Chatbot service is healthy',
@@ -242,7 +222,6 @@ router.get('/health', (req, res) => {
 // @desc    Test voice endpoint availability
 // @access  Private
 router.get('/voice-test', auth, (req, res) => {
-  console.log('🧪 Voice test endpoint called by:', req.user?.email);
   res.json({
     success: true,
     message: 'Voice endpoint is available',
@@ -259,246 +238,483 @@ router.post('/voice-text',
   textMessageValidation,
   handleValidationErrors,
   async (req, res) => {
-  try {
-    const { message, language = 'en', confidence = 0.95, voiceMetadata = {} } = req.body;
+    try {
+      const { message, language = 'en', confidence = 0.95, voiceMetadata = {}, conversationContext = {} } = req.body;
 
-    // Detect language from actual message content if not provided or if auto
-    const detectedLanguage = (language === 'auto' || !language) ? detectLanguageFromText(message) : language;
+      if (!message || message.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Message text is required'
+        });
+      }
 
-    console.log('Voice-text route: Processing transcribed voice message...');
-    console.log('Voice-text route: Message:', message);
-    console.log('Voice-text route: Input Language:', language);
-    console.log('Voice-text route: Detected Language:', detectedLanguage);
-    console.log('Voice-text route: Confidence:', confidence);
+      const trimmedMessage = message.trim();
+      const startTime = Date.now();
 
-    // Process with Gemini Pro using detected language
-    const geminiResult = await geminiVoiceService.processTextWithGemini(message, {
-      language: detectedLanguage,
-      inputMethod: 'voice',
-      userType: 'citizen'
-    });
+      // Detect language from actual message content if not provided or if auto
+      const detectedLanguage = (language === 'auto' || !language) ? detectLanguageFromText(trimmedMessage) : language;
 
-    if (geminiResult.success) {
+
+      // Process with Gemini Pro (with fallback for quota issues)
+      let geminiResult;
+      try {
+        geminiResult = await geminiVoiceService.processTextWithGemini(trimmedMessage, {
+          language: detectedLanguage,
+          inputMethod: 'voice',
+          userType: 'citizen'
+        });
+      } catch (error) {
+        const category = categorizeRequest(trimmedMessage);
+        const priority = determinePriority(trimmedMessage);
+
+        geminiResult = {
+          success: true,
+          response: generateFallbackResponse(category, trimmedMessage),
+          category: category,
+          priority: priority,
+          usingFallback: true
+        };
+      }
+
+      // Decide final category/priority
+      const heuristicCategory = categorizeRequest(trimmedMessage);
+      let finalCategory = (geminiResult.category && geminiResult.category !== 'general_inquiry')
+        ? geminiResult.category
+        : heuristicCategory;
+      const finalPriority = geminiResult.priority || determinePriority(trimmedMessage);
+
+
+      // Use Gemini to extract information intelligently (same as text route)
+      let extractedInfo = {};
+      let missingInfo = [];
+      let needsMoreInfo = false;
+      let geminiExtraction = null;
+
+      if (shouldCreateRequest(finalCategory, trimmedMessage)) {
+
+        // Try Gemini-powered extraction first
+        geminiExtraction = await geminiVoiceService.extractInformationWithGemini(
+          trimmedMessage,
+          finalCategory,
+          detectedLanguage,
+          conversationContext
+        );
+
+
+        if (geminiExtraction.success && !geminiExtraction.usingFallback) {
+          extractedInfo = { ...conversationContext, ...geminiExtraction.extractedInfo };
+          missingInfo = geminiExtraction.missingRequired || [];
+          needsMoreInfo = geminiExtraction.needsMoreInfo || false;
+        } else {
+          // Fallback to hardcoded extraction
+          extractedInfo = extractRequestInfo(trimmedMessage, finalCategory, conversationContext);
+          missingInfo = getMissingRequiredInfo(finalCategory, extractedInfo);
+          needsMoreInfo = missingInfo.length > 0;
+        }
+
+      }
+
+      let createdRequest = null;
+      let responseMessage = '';
+
+      if (shouldCreateRequest(finalCategory, trimmedMessage)) {
+        if (needsMoreInfo && missingInfo.length > 0) {
+
+          // Use Gemini to generate intelligent follow-up question
+          const geminiQuestion = await geminiVoiceService.generateFollowUpQuestion(
+            finalCategory,
+            missingInfo[0],
+            extractedInfo,
+            detectedLanguage
+          );
+
+          if (geminiQuestion.success && !geminiQuestion.usingFallback) {
+            responseMessage = geminiQuestion.question;
+          } else {
+            // Fallback to template-based questions
+            responseMessage = generateFollowUpQuestion(finalCategory, missingInfo[0], extractedInfo);
+          }
+
+          // Save chat with pending request context
+          await saveChatMessage(
+            req.user.userId,
+            trimmedMessage,
+            responseMessage,
+            finalCategory,
+            finalPriority,
+            'voice',
+            { confidence, detectedLanguage, duration: voiceMetadata.duration || 0 },
+            {
+              usingFallback: geminiResult.usingFallback,
+              processingTime: Date.now() - startTime,
+              pendingRequest: true,
+              extractedInfo: extractedInfo,
+              missingInfo: missingInfo,
+              geminiExtraction: geminiExtraction?.success || false
+            }
+          );
+        } else {
+          // We have all required information, create the request
+          try {
+            createdRequest = await createRequestFromChatWithInfo(
+              req.user.userId,
+              trimmedMessage,
+              finalCategory,
+              finalPriority,
+              extractedInfo
+            );
+
+            // Use Gemini to generate success message
+            try {
+              const successPrompt = `A user successfully created a ${finalCategory.replace('_', ' ')} request via voice.
+
+Details:
+${JSON.stringify(extractedInfo, null, 2)}
+
+Request ID: ${createdRequest._id}
+
+Generate a friendly, encouraging confirmation message in ${detectedLanguage}. 
+- Acknowledge what they requested
+- Mention the key details they provided
+- Tell them what happens next (volunteers will be notified)
+- Keep it warm and human
+- 2-3 sentences max`;
+
+              const geminiSuccess = await geminiVoiceService.processTextWithGemini(successPrompt, {
+                language: detectedLanguage,
+                inputMethod: 'voice',
+                userType: 'citizen'
+              });
+
+              responseMessage = geminiSuccess.response || generateSuccessMessage(finalCategory, extractedInfo, createdRequest);
+            } catch (error) {
+              // Fallback to template if Gemini fails
+              responseMessage = generateSuccessMessage(finalCategory, extractedInfo, createdRequest);
+            }
+
+            const chatMessage = await saveChatMessage(
+              req.user.userId,
+              trimmedMessage,
+              responseMessage,
+              finalCategory,
+              finalPriority,
+              'voice',
+              { confidence, detectedLanguage, duration: voiceMetadata.duration || 0 },
+              {
+                usingFallback: geminiResult.usingFallback,
+                processingTime: Date.now() - startTime,
+                geminiResponse: geminiResult.response,
+                geminiExtraction: geminiExtraction?.success || false
+              }
+            );
+
+            if (createdRequest) {
+              await chatMessage.markAsRequestCreator(createdRequest._id);
+            }
+          } catch (requestError) {
+            console.error('❌ Voice: Failed to create request:', requestError.message);
+            responseMessage = 'I understood your request, but encountered an error saving it. Please try again.';
+          }
+        }
+      } else {
+        // General inquiry or greeting - use Gemini's direct response
+        responseMessage = geminiResult.response || 'How can I help you today?';
+
+        await saveChatMessage(
+          req.user.userId,
+          trimmedMessage,
+          responseMessage,
+          finalCategory,
+          finalPriority,
+          'voice',
+          { confidence, detectedLanguage, duration: voiceMetadata.duration || 0 },
+          {
+            usingFallback: geminiResult.usingFallback,
+            processingTime: Date.now() - startTime,
+            geminiResponse: geminiResult.response
+          }
+        );
+      }
+
+      // Build response payload
       const responseData = {
         id: Date.now().toString(),
-        transcribedText: message,
-        category: geminiResult.category,
-        priority: geminiResult.priority,
-        geminiResponse: geminiResult.response,
+        transcribedText: trimmedMessage,
+        category: finalCategory,
+        priority: finalPriority,
+        extractedInfo: extractedInfo,
+        missingInfo: missingInfo,
+        needsMoreInfo: needsMoreInfo,
+        geminiResponse: responseMessage,
         detectedLanguage: detectedLanguage,
         confidence: confidence,
         processedAt: new Date(),
+        createdRequestId: createdRequest?._id || null,
         needsVoiceResponse: true,
-        voiceResponse: geminiVoiceService.prepareVoiceResponse(geminiResult.response, detectedLanguage),
-        usingFallback: geminiResult.usingFallback || false
+        voiceResponse: geminiVoiceService.prepareVoiceResponse(responseMessage, detectedLanguage),
+        usingFallback: geminiResult.usingFallback || false,
+        geminiExtraction: geminiExtraction?.success || false
       };
+
 
       res.json({
         success: true,
-        message: geminiResult.usingFallback ? 'Voice request processed (fallback mode)' : 'Voice request processed with Gemini AI',
+        message: createdRequest ? 'Request created successfully' : (needsMoreInfo ? 'Need more information' : 'Message processed'),
         data: responseData
       });
 
-      // Save to database asynchronously
-      setImmediate(async () => {
-        try {
-          // Always save chat message for history
-          const aiMetadata = {
-            usingFallback: false,
-            processingTime: Date.now() - (Date.now()),
-            geminiResponse: geminiResult.response
-          };
-
-          const voiceMetadataForChat = {
-            confidence,
-            duration: voiceMetadata.duration || 0,
-            detectedLanguage: detectedLanguage
-          };
-
-          const chatMessage = await saveChatMessage(
-            req.user.userId,
-            message,
-            geminiResult.response,
-            geminiResult.category,
-            geminiResult.priority,
-            'voice',
-            voiceMetadataForChat,
-            aiMetadata
-          );
-
-          // Only create Request for blood_request, elder_support, complaint
-          if (shouldCreateRequest(geminiResult.category, message)) {
-            const request = await createRequestFromChat(
-              req.user.userId,
-              message,
-              geminiResult.category,
-              geminiResult.priority,
-              true, // isVoice = true
-              { confidence, language: detectedLanguage, voiceMetadata }
-            );
-
-            // Mark chat message as having created a request
-            await chatMessage.markAsRequestCreator(request._id);
-            console.log('✅ Voice request created - Type:', geminiResult.category, 'Request ID:', request._id, 'Chat ID:', chatMessage._id);
-          } else {
-            console.log('💬 General voice chat saved - Category:', geminiResult.category, 'Chat ID:', chatMessage._id, '(No request created)');
-          }
-        } catch (dbError) {
-          console.error('Error saving voice message to database:', dbError);
-        }
+    } catch (error) {
+      console.error('Voice-text processing error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error processing voice request',
+        error: error.message
       });
-
-    } else {
-      throw new Error(geminiResult.error || 'Failed to process with Gemini');
     }
-
-  } catch (error) {
-    console.error('Voice-text processing error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error processing voice request',
-      error: error.message
-    });
-  }
-});
+  });
 
 // @route   POST /api/chatbot/text
-// @desc    Process text message (manual input)
+// @desc    Process text message (manual input) with intelligent follow-up questions
 // @access  Private
 router.post('/text',
   auth,
   textMessageValidation,
   handleValidationErrors,
   async (req, res) => {
-  try {
-    const { message, language = 'en' } = req.body;
-
-    if (!message || message.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Message text is required'
-      });
-    }
-
-    const trimmedMessage = message.trim();
-    const startTime = Date.now();
-    console.log('Processing text with Gemini:', trimmedMessage);
-
-    // Process with Gemini Pro (with fallback for quota issues)
-    let geminiResult;
     try {
-      geminiResult = await geminiVoiceService.processTextWithGemini(trimmedMessage, {
-        language,
-        inputMethod: 'text',
-        userType: 'citizen'
-      });
-    } catch (error) {
-      console.log('Gemini processing failed, using local fallback:', error.message);
+      const { message, language = 'en', conversationContext = {} } = req.body;
 
-      // Local fallback when Gemini is unavailable
-      const category = categorizeRequest(trimmedMessage);
-      const priority = determinePriority(trimmedMessage);
-
-      geminiResult = {
-        success: true,
-        response: generateFallbackResponse(category, trimmedMessage),
-        category: category,
-        priority: priority,
-        usingFallback: true
-      };
-    }
-
-    // Decide final category/priority and create request if needed BEFORE responding
-    const heuristicCategory = categorizeRequest(trimmedMessage);
-    let finalCategory = (geminiResult.category && geminiResult.category !== 'general_inquiry')
-      ? geminiResult.category
-      : heuristicCategory;
-    const finalPriority = geminiResult.priority || determinePriority(trimmedMessage);
-
-    // If Gemini returned a generic response but our heuristic is specific, align to heuristic
-    if (geminiResult && geminiResult.success && geminiResult.response && geminiResult.category === 'general_inquiry' && heuristicCategory !== 'general_inquiry') {
-      geminiResult.category = heuristicCategory;
-      finalCategory = heuristicCategory;
-      try {
-        geminiResult.response = generateFallbackResponse(heuristicCategory, trimmedMessage);
-      } catch (e) {
-        console.warn('Failed to generate heuristic fallback response:', e.message);
+      if (!message || message.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Message text is required'
+        });
       }
-    }
 
-    const aiMetadata = {
-      usingFallback: !geminiResult.success,
-      processingTime: Date.now() - (startTime || Date.now()),
-      geminiResponse: geminiResult.success ? geminiResult.response : null
-    };
+      const trimmedMessage = message.trim();
+      const startTime = Date.now();
 
-    // Save chat first
-    const chatMessage = await saveChatMessage(
-      req.user.userId,
-      trimmedMessage,
-      geminiResult.success ? geminiResult.response : `Thank you for your message. I'm here to help with blood requests, elder support, and complaints.`,
-      finalCategory,
-      finalPriority,
-      'text',
-      null,
-      aiMetadata
-    );
 
-    let createdRequest = null;
-    let bloodType = null;
-    if (shouldCreateRequest(finalCategory, trimmedMessage)) {
+      // Process with Gemini Pro (with fallback for quota issues)
+      let geminiResult;
       try {
-        createdRequest = await createRequestFromChat(
-          req.user.userId,
+        geminiResult = await geminiVoiceService.processTextWithGemini(trimmedMessage, {
+          language,
+          inputMethod: 'text',
+          userType: 'citizen'
+        });
+      } catch (error) {
+        const category = categorizeRequest(trimmedMessage);
+        const priority = determinePriority(trimmedMessage);
+
+        geminiResult = {
+          success: true,
+          response: generateFallbackResponse(category, trimmedMessage),
+          category: category,
+          priority: priority,
+          usingFallback: true
+        };
+      }
+
+      // Decide final category/priority
+      const heuristicCategory = categorizeRequest(trimmedMessage);
+      let finalCategory = (geminiResult.category && geminiResult.category !== 'general_inquiry')
+        ? geminiResult.category
+        : heuristicCategory;
+      const finalPriority = geminiResult.priority || determinePriority(trimmedMessage);
+
+
+      // Use Gemini to extract information intelligently
+      let extractedInfo = {};
+      let missingInfo = [];
+      let needsMoreInfo = false;
+      let geminiExtraction = null;
+
+      if (shouldCreateRequest(finalCategory, trimmedMessage)) {
+
+        // Try Gemini-powered extraction first
+        geminiExtraction = await geminiVoiceService.extractInformationWithGemini(
           trimmedMessage,
           finalCategory,
-          finalPriority,
-          false,
-          null
+          language,
+          conversationContext
         );
-        if (createdRequest) {
-          await chatMessage.markAsRequestCreator(createdRequest._id);
-          if (finalCategory === 'blood_request') {
-            bloodType = createdRequest.bloodType || extractBloodType(trimmedMessage);
+
+
+        if (geminiExtraction.success && !geminiExtraction.usingFallback) {
+          extractedInfo = { ...conversationContext, ...geminiExtraction.extractedInfo };
+          missingInfo = geminiExtraction.missingRequired || [];
+          needsMoreInfo = geminiExtraction.needsMoreInfo || false;
+        } else {
+          // Fallback to hardcoded extraction
+          extractedInfo = extractRequestInfo(trimmedMessage, finalCategory, conversationContext);
+
+          // Ensure urgency extraction in fallback too!
+          if (!extractedInfo.urgencyLevel) {
+            extractedInfo.urgencyLevel = extractUrgency(trimmedMessage);
           }
-          console.log('✅ Request created successfully from chat:', createdRequest._id);
+
+          missingInfo = getMissingRequiredInfo(finalCategory, extractedInfo);
+          needsMoreInfo = missingInfo.length > 0;
         }
-      } catch (requestError) {
-        console.error('❌ Failed to create request from chat:', requestError.message);
-        // Continue without creating request - just save the chat message
-        createdRequest = null;
       }
+
+      let createdRequest = null;
+      let responseMessage = '';
+
+      if (shouldCreateRequest(finalCategory, trimmedMessage)) {
+        if (needsMoreInfo && missingInfo.length > 0) {
+
+          // Use Gemini to generate intelligent follow-up question
+          const geminiQuestion = await geminiVoiceService.generateFollowUpQuestion(
+            finalCategory,
+            missingInfo[0],
+            extractedInfo,
+            language
+          );
+
+          if (geminiQuestion.success && !geminiQuestion.usingFallback) {
+            responseMessage = geminiQuestion.question;
+          } else {
+            // Fallback to template-based questions
+            responseMessage = generateFollowUpQuestion(finalCategory, missingInfo[0], extractedInfo);
+          }
+
+          // Save chat with pending request context
+          await saveChatMessage(
+            req.user.userId,
+            trimmedMessage,
+            responseMessage,
+            finalCategory,
+            finalPriority,
+            'text',
+            null,
+            {
+              usingFallback: geminiResult.usingFallback,
+              processingTime: Date.now() - startTime,
+              pendingRequest: true,
+              extractedInfo: extractedInfo,
+              missingInfo: missingInfo,
+              geminiExtraction: geminiExtraction?.success || false
+            }
+          );
+        } else {
+
+
+          // We have all required information, create the request
+          try {
+            createdRequest = await createRequestFromChatWithInfo(
+              req.user.userId,
+              trimmedMessage,
+              finalCategory,
+              finalPriority,
+              extractedInfo
+            );
+
+            // Use Gemini to generate success message
+            try {
+              const successPrompt = `A user successfully created a ${finalCategory.replace('_', ' ')} request.
+
+Details:
+${JSON.stringify(extractedInfo, null, 2)}
+
+Request ID: ${createdRequest._id}
+
+Generate a friendly, encouraging confirmation message in ${language}. 
+- Acknowledge what they requested
+- Mention the key details they provided
+- Tell them what happens next (volunteers will be notified)
+- Keep it warm and human
+- 2-3 sentences max`;
+
+              const geminiSuccess = await geminiVoiceService.processTextWithGemini(successPrompt, {
+                language,
+                inputMethod: 'text',
+                userType: 'citizen'
+              });
+
+              responseMessage = geminiSuccess.response || generateSuccessMessage(finalCategory, extractedInfo, createdRequest);
+            } catch (error) {
+              // Fallback to template if Gemini fails
+              responseMessage = generateSuccessMessage(finalCategory, extractedInfo, createdRequest);
+            }
+
+            const chatMessage = await saveChatMessage(
+              req.user.userId,
+              trimmedMessage,
+              responseMessage,
+              finalCategory,
+              finalPriority,
+              'text',
+              null,
+              {
+                usingFallback: geminiResult.usingFallback,
+                processingTime: Date.now() - startTime,
+                geminiResponse: geminiResult.response,
+                geminiExtraction: geminiExtraction?.success || false
+              }
+            );
+
+            if (createdRequest) {
+              await chatMessage.markAsRequestCreator(createdRequest._id);
+            }
+          } catch (requestError) {
+            responseMessage = 'I understood your request, but encountered an error saving it. Please try again.';
+          }
+        }
+      } else {
+        // General inquiry or greeting - use Gemini's direct response
+        responseMessage = geminiResult.response || 'How can I help you today?';
+
+        await saveChatMessage(
+          req.user.userId,
+          trimmedMessage,
+          responseMessage,
+          finalCategory,
+          finalPriority,
+          'text',
+          null,
+          {
+            usingFallback: geminiResult.usingFallback,
+            processingTime: Date.now() - startTime,
+            geminiResponse: geminiResult.response
+          }
+        );
+      }
+
+      // Build response payload
+      const responseData = {
+        id: Date.now().toString(),
+        transcribedText: trimmedMessage,
+        category: finalCategory,
+        priority: finalPriority,
+        extractedInfo: extractedInfo,
+        missingInfo: missingInfo,
+        needsMoreInfo: needsMoreInfo,
+        geminiResponse: responseMessage,
+        processedAt: new Date(),
+        createdRequestId: createdRequest?._id || null,
+        needsVoiceResponse: false,
+        usingFallback: geminiResult.usingFallback || false,
+        geminiExtraction: geminiExtraction?.success || false
+      };
+
+
+      res.json({
+        success: true,
+        message: createdRequest ? 'Request created successfully' : (needsMoreInfo ? 'Need more information' : 'Message processed'),
+        data: responseData
+      });
+
+    } catch (error) {
+      console.error('Text processing error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error processing text message',
+        error: error.message
+      });
     }
-
-    // Build response payload
-    const responseData = {
-      id: Date.now().toString(),
-      transcribedText: trimmedMessage,
-      category: finalCategory,
-      priority: finalPriority,
-      bloodType: bloodType,
-      geminiResponse: geminiResult.response,
-      processedAt: new Date(),
-      createdRequestId: createdRequest?._id || null,
-      needsVoiceResponse: false,
-      usingFallback: geminiResult.usingFallback || false
-    };
-
-    res.json({
-      success: true,
-      message: geminiResult.usingFallback ? 'Message processed (fallback mode)' : 'Message processed with AI assistance',
-      data: responseData
-    });
-
-  } catch (error) {
-    console.error('Text processing error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error processing text message',
-      error: error.message
-    });
-  }
-});
+  });
 
 // Helper Functions
 
@@ -520,7 +736,7 @@ async function saveChatMessage(userId, message, response, category, priority, me
     });
 
     await chatMessage.save();
-    console.log('💾 Chat message saved:', chatMessage._id, 'Type:', messageType, 'Category:', category);
+
     return chatMessage;
   } catch (error) {
     console.error('Error saving chat message:', error);
@@ -537,19 +753,132 @@ function shouldCreateRequest(category, message) {
 }
 
 /**
- * Create a Request from chat message
+ * Create request from chat with extracted information
  */
-async function createRequestFromChat(userId, message, category, priority, isVoice = false, voiceData = null) {
+async function createRequestFromChatWithInfo(userId, message, category, priority, extractedInfo) {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const requestType = category === 'blood_request' ? 'blood' :
+    category === 'elder_support' ? 'elder_support' :
+      category === 'complaint' ? 'complaint' : null;
+
+  if (!requestType) {
+    throw new Error('Invalid request category');
+  }
+
+  // Map priority
+  const mappedPriority = priority === 'urgent' ? 'urgent' : (priority === 'high' ? 'high' : 'medium');
+
+  const requestData = {
+    type: requestType,
+    user: userId,
+    name: user.name,
+    phone: user.phone || 'Not provided',
+    email: user.email,
+    location: {
+      type: 'manual',
+      coordinates: {
+        lat: 16.523699,
+        lng: 80.61359225
+      },
+      address: extractedInfo.location || 'Potti Sriramulu College Road, Vinchipeta',
+      city: 'Vijayawada',
+      state: 'Andhra Pradesh',
+      pincode: '520001',
+      country: 'India'
+    },
+    priority: mappedPriority,
+    status: 'pending'
+  };
+
+  // Add specific fields based on request type
+  if (requestType === 'blood') {
+    // 1. Try regex extraction first (Prioritize exact keywords)
+    const regexUrgency = extractUrgency(message);
+
+    // 2. Then try Gemini extracted urgency
+    const geminiUrgency = extractedInfo.urgencyLevel ? extractedInfo.urgencyLevel.toLowerCase() : null;
+
+    // 3. Determine final urgency: Regex > Gemini > Default (High)
+    let urgencyLevel = regexUrgency || geminiUrgency || 'high';
+
+    // Override the generic priority with our specific extracted urgency
+    // This fixes the issue where initial classification might be "high" but user said "medium"
+    requestData.priority = urgencyLevel;
+
+    requestData.bloodType = extractedInfo.bloodType;
+    requestData.urgencyLevel = urgencyLevel;
+    requestData.unitsNeeded = extractedInfo.unitsNeeded || 1;
+    requestData.hospitalName = extractedInfo.hospitalName || 'To be specified';
+    requestData.patientName = extractedInfo.patientName || user.name;
+    requestData.relationship = extractedInfo.relationship || 'Self';
+    requestData.medicalCondition = extractedInfo.medicalCondition || message;
+    requestData.contactNumber = user.phone || 'Not provided';
+    requestData.requiredDate = extractedInfo.requiredDate ? new Date(extractedInfo.requiredDate) : new Date();
+    requestData.additionalNotes = message;
+
+    const { title, description } = buildTitleAndDescription({
+      message,
+      type: 'blood',
+      priority: urgencyLevel,
+      bloodType: extractedInfo.bloodType,
+      location: extractedInfo.location
+    });
+    requestData.title = title;
+    requestData.description = description;
+
+  } else if (requestType === 'elder_support') {
+    requestData.serviceType = extractedInfo.serviceType || 'Other';
+    requestData.elderName = extractedInfo.elderName || user.name;
+    requestData.age = extractedInfo.age || 'Not specified';
+    requestData.supportType = extractedInfo.supportType || ['other'];
+    requestData.frequency = extractedInfo.frequency || 'one-time';
+    requestData.timeSlot = extractedInfo.timeSlot || 'flexible';
+    requestData.specialRequirements = extractedInfo.specialRequirements || message;
+    requestData.dueDate = extractedInfo.requiredDate ? new Date(extractedInfo.requiredDate) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const { title, description } = buildTitleAndDescription({
+      message,
+      type: 'elder_support',
+      priority,
+      location: extractedInfo.location
+    });
+    requestData.title = title;
+    requestData.description = description;
+
+  } else if (requestType === 'complaint') {
+    requestData.complaintCategory = extractedInfo.complaintCategory || 'Other';
+    requestData.complaintLocation = extractedInfo.complaintLocation || extractedInfo.location || 'Not specified';
+    requestData.severity = extractedInfo.severity || 'medium';
+    requestData.description = extractedInfo.description || message;
+
+    const { title, description } = buildTitleAndDescription({
+      message,
+      type: 'complaint',
+      priority,
+      complaintCategory: extractedInfo.complaintCategory,
+      location: extractedInfo.complaintLocation || extractedInfo.location
+    });
+    requestData.title = title;
+    requestData.description = description;
+  }
+
+  const request = await Request.create(requestData);
+  return request;
+}
+
+/**
+ * Create request from chat message (legacy function)
+ */
+async function createRequestFromChat(userId, message, category, priority, isVoice = false, voiceMetadata = null) {
   try {
-    console.log('createRequestFromChat called with:');
-    console.log('- Category:', category);
-    console.log('- Message:', message);
-    console.log('- Priority:', priority);
 
     // Get user details (or use dummy data for testing)
     let user = await User.findById(userId);
     if (!user) {
-      console.log('User not found, using dummy data for testing');
       user = {
         name: 'Test User',
         phone: '1234567890',
@@ -570,11 +899,9 @@ async function createRequestFromChat(userId, message, category, priority, isVoic
       requestType = 'complaint';
     }
 
-    console.log('Determined request type:', requestType, 'from category:', category);
 
     // Create base request data with proper location handling
     const mappedPriority = priority === 'urgent' ? 'urgent' : (priority === 'high' ? 'high' : 'medium');
-    console.log('Priority mapping:', priority, '->', mappedPriority);
 
     const requestData = {
       type: requestType,
@@ -608,10 +935,8 @@ async function createRequestFromChat(userId, message, category, priority, isVoic
         const extendedMatch = message.match(/(O\s*positive|O\s*negative|A\s*positive|A\s*negative|B\s*positive|B\s*negative|AB\s*positive|AB\s*negative|o\s*positive|o\s*negative|a\s*positive|a\s*negative|b\s*positive|b\s*negative|ab\s*positive|ab\s*negative)/i);
         if (extendedMatch) {
           requestData.bloodType = extendedMatch[0].toUpperCase().replace(/\s+/g, '').replace('POSITIVE', '+').replace('NEGATIVE', '-');
-        } else {
-          // If still no blood type found, don't default - let user specify
-          requestData.bloodType = 'Not specified';
         }
+        // Don't set a default value - leave it undefined so the system knows to ask for it
       } else {
         requestData.bloodType = extractedBloodType;
       }
@@ -677,12 +1002,9 @@ async function createRequestFromChat(userId, message, category, priority, isVoic
     }
 
     // Create the request
-    console.log('About to create request with data:', JSON.stringify(requestData, null, 2));
     const request = new Request(requestData);
-    console.log('Request object before save - priority:', request.priority);
     await request.save();
 
-    console.log('Created request from chat:', request._id, 'Type:', requestType);
     return request;
   } catch (error) {
     console.error('Error creating request from chat:', error);
@@ -720,10 +1042,9 @@ function buildTitleAndDescription({ message, type, priority, bloodType, complain
   let description = '';
 
   if (type === 'blood') {
-    const bt = bloodType || extractBloodType(message);
-    const urgentTag = (priority === 'urgent') ? ' (URGENT)' : '';
-    title = `Need ${bt} blood${location ? ' in ' + location : ''}${urgentTag}`;
-    description = `Request for ${bt} blood${location ? ' in ' + location : ''}. Priority: ${(priority || 'medium').toUpperCase()}.`;
+    const bt = bloodType || 'blood';
+    title = `Need ${bt} blood${location ? ' - ' + location : ''}`;
+    description = `Request for ${bt} blood${location ? ' in ' + location : ''}.`;
 
   } else if (type === 'elder_support') {
     let kind = 'Elder support needed';
@@ -732,7 +1053,7 @@ function buildTitleAndDescription({ message, type, priority, bloodType, complain
     else if (/appointment|hospital|clinic|checkup/i.test(message)) kind = 'Medical appointment help';
     else if (/house|clean|cook|laundry|household/i.test(message)) kind = 'Household help needed';
     title = `${kind}${location ? ' - ' + location : ''}`;
-    description = `Elder support request: ${kind}${location ? ' in ' + location : ''}. Priority: ${(priority || 'medium').toUpperCase()}.`;
+    description = `Elder support request: ${kind}${location ? ' in ' + location : ''}.`;
 
   } else if (type === 'complaint') {
     const c = complaintCategory || 'Other';
@@ -922,6 +1243,20 @@ function extractBloodType(text) {
 }
 
 /**
+ * Extract urgency level from text
+ */
+function extractUrgency(text) {
+  const t = text.toLowerCase();
+
+  if (/urgent|emergency|asap|immediately|critical|dying|serious/i.test(t)) return 'urgent';
+  if (/low|not urgent|can wait|flexible|when possible|whenever/i.test(t)) return 'low';
+  if (/high|soon|needed|required|fast|quick/i.test(t)) return 'high';
+  if (/medium|normal|regular|moderate|standard/i.test(t)) return 'medium';
+
+  return null;
+}
+
+/**
  * Categorize request based on content
  */
 function categorizeRequest(text) {
@@ -1024,6 +1359,269 @@ function generateFallbackResponse(category, message) {
   return responses[category] || responses['general_inquiry'];
 }
 
+/**
+ * Extract information from user message based on category
+ */
+function extractRequestInfo(message, category, conversationContext = {}) {
+  const info = { ...conversationContext };
+  const lowerMessage = message.toLowerCase();
+
+  // Extract blood type for blood requests
+  if (category === 'blood_request') {
+    const bloodType = extractBloodType(message);
+    if (bloodType) info.bloodType = bloodType;
+
+    // Extract units needed
+    const unitsMatch = message.match(/(\d+)\s*(unit|pint|bag)/i);
+    if (unitsMatch) info.unitsNeeded = parseInt(unitsMatch[1]);
+
+    // Extract hospital name
+    const hospitalMatch = message.match(/(?:at|in|from)\s+([A-Z][a-zA-Z\s]+(?:hospital|medical|clinic|centre|center))/i);
+    if (hospitalMatch) info.hospitalName = hospitalMatch[1].trim();
+
+    // Extract patient relationship
+    if (lowerMessage.includes('my mother') || lowerMessage.includes('mom')) info.relationship = 'Mother';
+    else if (lowerMessage.includes('my father') || lowerMessage.includes('dad')) info.relationship = 'Father';
+    else if (lowerMessage.includes('my brother')) info.relationship = 'Brother';
+    else if (lowerMessage.includes('my sister')) info.relationship = 'Sister';
+    else if (lowerMessage.includes('my friend')) info.relationship = 'Friend';
+    else if (lowerMessage.includes('myself') || lowerMessage.includes('for me')) info.relationship = 'Self';
+
+    // Extract urgency/date
+    if (lowerMessage.includes('urgent') || lowerMessage.includes('emergency') || lowerMessage.includes('immediately')) {
+      info.urgencyLevel = 'urgent';
+      info.requiredDate = new Date();
+    } else if (lowerMessage.includes('today')) {
+      info.requiredDate = new Date();
+    } else if (lowerMessage.includes('tomorrow')) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      info.requiredDate = tomorrow;
+    }
+  }
+
+  // Extract elder support information
+  if (category === 'elder_support') {
+    // Extract age
+    const ageMatch = message.match(/(\d{2,3})\s*(?:year|yr|age)/i);
+    if (ageMatch) info.age = ageMatch[1];
+
+    // Extract elder name
+    const nameMatch = message.match(/(?:for|help)\s+(?:my\s+)?(?:mother|father|grandmother|grandfather|grandma|grandpa)\s+([A-Z][a-z]+)/i);
+    if (nameMatch) info.elderName = nameMatch[1];
+
+    // Extract service type - must match Request schema enum values
+    if (lowerMessage.includes('medicine') || lowerMessage.includes('medication') || lowerMessage.includes('pills')) {
+      info.serviceType = 'Medicine Delivery';
+      info.supportType = ['medical'];
+    } else if (lowerMessage.includes('doctor') || lowerMessage.includes('appointment') || lowerMessage.includes('medical')) {
+      info.serviceType = 'Medical Appointment';
+      info.supportType = ['medical'];
+    } else if (lowerMessage.includes('food') || lowerMessage.includes('meal') || lowerMessage.includes('cooking') || lowerMessage.includes('grocery')) {
+      info.serviceType = 'Grocery Shopping';
+      info.supportType = ['food'];
+    } else if (lowerMessage.includes('clean') || lowerMessage.includes('hygiene') || lowerMessage.includes('household')) {
+      info.serviceType = 'Household Help';
+      info.supportType = ['hygiene'];
+    } else if (lowerMessage.includes('companion') || lowerMessage.includes('company') || lowerMessage.includes('talk')) {
+      info.serviceType = 'Companionship';
+      info.supportType = ['companionship'];
+    } else if (lowerMessage.includes('emergency') || lowerMessage.includes('urgent')) {
+      info.serviceType = 'Emergency Assistance';
+      info.supportType = ['emergency'];
+    }
+
+    // Extract frequency
+    if (lowerMessage.includes('daily') || lowerMessage.includes('every day')) info.frequency = 'daily';
+    else if (lowerMessage.includes('weekly') || lowerMessage.includes('once a week')) info.frequency = 'weekly';
+    else if (lowerMessage.includes('monthly')) info.frequency = 'monthly';
+    else if (lowerMessage.includes('one time') || lowerMessage.includes('just once')) info.frequency = 'one-time';
+  }
+
+  // Extract complaint information
+  if (category === 'complaint') {
+    // Extract location
+    const locationMatch = message.match(/(?:at|in|near)\s+([A-Z][a-zA-Z\s,]+)/);
+    if (locationMatch) info.complaintLocation = locationMatch[1].trim();
+
+    // Determine complaint category - be smart about mapping
+    if (lowerMessage.includes('road') || lowerMessage.includes('pothole') || lowerMessage.includes('pot hole') || lowerMessage.includes('street') || lowerMessage.includes('pavement')) {
+      info.complaintCategory = 'Road Maintenance';
+    } else if (lowerMessage.includes('water') || lowerMessage.includes('drainage') || lowerMessage.includes('leak')) {
+      info.complaintCategory = 'Water Supply';
+    } else if (lowerMessage.includes('garbage') || lowerMessage.includes('waste') || lowerMessage.includes('trash') || lowerMessage.includes('dump')) {
+      info.complaintCategory = 'Waste Management';
+    } else if (lowerMessage.includes('electricity') || lowerMessage.includes('power') || lowerMessage.includes('light') || lowerMessage.includes('electric')) {
+      info.complaintCategory = 'Electricity';
+    } else if (lowerMessage.includes('safety') || lowerMessage.includes('crime') || lowerMessage.includes('security')) {
+      info.complaintCategory = 'Public Safety';
+    }
+  }
+
+  return info;
+}
+
+/**
+ * Get list of missing required information
+ */
+function getMissingRequiredInfo(category, extractedInfo) {
+  const missing = [];
+
+  if (category === 'blood_request') {
+    // Only bloodType is required - units and hospital are optional
+    if (!extractedInfo.bloodType) missing.push('bloodType');
+  }
+
+  if (category === 'elder_support') {
+    if (!extractedInfo.serviceType && !extractedInfo.supportType) missing.push('serviceType');
+  }
+
+  if (category === 'complaint') {
+    if (!extractedInfo.complaintCategory) missing.push('complaintCategory');
+  }
+
+  return missing;
+}
+
+/**
+ * Generate follow-up question for missing information
+ */
+function generateFollowUpQuestion(category, missingField, extractedInfo) {
+  const questions = {
+    blood_request: {
+      bloodType: `I understand you need blood. What blood type is required? (e.g., A+, B+, O+, AB+, A-, B-, O-, AB-)`,
+      unitsNeeded: `How many units of ${extractedInfo.bloodType || 'blood'} do you need?`,
+      hospitalName: `Which hospital or medical center is this for?`,
+      relationship: `Who needs the blood? (e.g., myself, mother, father, friend)`,
+      urgencyLevel: `When is the blood needed? (e.g., urgent/today, tomorrow, this week)`
+    },
+    elder_support: {
+      serviceType: `What kind of support do you need?\n• Medical Care\n• Food & Nutrition\n• Personal Hygiene\n• Companionship\n• Other`,
+      age: `What is the age of the person needing support?`,
+      frequency: `How often is support needed? (e.g., daily, weekly, one-time)`
+    },
+    complaint: {
+      complaintCategory: `What type of issue are you reporting?\n• Road Maintenance\n• Water Supply\n• Waste Management\n• Electricity\n• Public Safety\n• Other`,
+      complaintLocation: `Where is this issue located? (Please provide the address or area)`
+    }
+  };
+
+  return questions[category]?.[missingField] || 'Could you provide more details about your request?';
+}
+
+/**
+ * Create request with extracted information
+ */
+async function createRequestFromChatWithInfo(userId, message, category, priority, extractedInfo) {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // CRITICAL: Validate we have all required info BEFORE creating request
+  if (category === 'blood_request') {
+    if (!extractedInfo.bloodType) {
+      throw new Error('Cannot create blood request without blood type');
+    }
+  }
+
+  let requestType = category === 'blood_request' ? 'blood' : category;
+  const mappedPriority = priority === 'urgent' ? 'urgent' : (priority === 'high' ? 'high' : 'medium');
+
+  const requestData = {
+    type: requestType,
+    user: userId,
+    name: user.name,
+    phone: user.phone || 'Not provided',
+    email: user.email,
+    location: {
+      type: 'manual',
+      coordinates: { lat: 16.523699, lng: 80.61359225 },
+      address: 'Potti Sriramulu College Road, Vinchipeta',
+      city: 'Vijayawada',
+      state: 'Andhra Pradesh',
+      pincode: '520001',
+      country: 'India'
+    },
+    priority: mappedPriority,
+    status: 'pending'
+  };
+
+  // Add type-specific fields from extracted info
+  if (requestType === 'blood') {
+    const englishMessage = translateToEnglish(message);
+    requestData.bloodType = extractedInfo.bloodType; // REQUIRED - already validated above
+    requestData.urgencyLevel = extractedInfo.urgencyLevel || (priority === 'urgent' ? 'urgent' : 'high');
+    requestData.unitsNeeded = extractedInfo.unitsNeeded || 1;
+    requestData.hospitalName = extractedInfo.hospitalName || 'To be confirmed';
+    requestData.patientName = extractedInfo.patientName || user.name;
+    requestData.relationship = extractedInfo.relationship || 'Self';
+    requestData.medicalCondition = englishMessage;
+    requestData.contactNumber = user.phone || 'Not provided';
+    requestData.requiredDate = extractedInfo.requiredDate || new Date();
+    requestData.additionalNotes = englishMessage;
+    const { title, description } = buildTitleAndDescription({
+      message: englishMessage,
+      type: 'blood',
+      priority,
+      bloodType: extractedInfo.bloodType
+    });
+    requestData.title = title;
+    requestData.description = description;
+  } else if (requestType === 'elder_support') {
+    const englishMessage = translateToEnglish(message);
+    requestData.serviceType = extractedInfo.serviceType || 'Other';
+    requestData.elderName = extractedInfo.elderName || user.name;
+    requestData.age = extractedInfo.age || 'Not specified';
+    requestData.supportType = extractedInfo.supportType || ['other'];
+    requestData.frequency = extractedInfo.frequency || 'one-time';
+    requestData.timeSlot = 'flexible';
+    requestData.specialRequirements = englishMessage;
+    requestData.dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const { title, description } = buildTitleAndDescription({
+      message: englishMessage,
+      type: 'elder_support',
+      priority
+    });
+    requestData.title = title;
+    requestData.description = description;
+  } else if (requestType === 'complaint') {
+    const englishMessage = translateToEnglish(message);
+    requestData.category = extractedInfo.complaintCategory || 'Other';
+    requestData.severity = priority === 'urgent' ? 'high' : 'medium';
+    const { title, description } = buildTitleAndDescription({
+      message: englishMessage,
+      type: 'complaint',
+      priority,
+      complaintCategory: requestData.category
+    });
+    requestData.title = title;
+    requestData.description = description;
+  }
+
+  requestData.source = 'text_chat';
+
+  const request = new Request(requestData);
+  await request.save();
+
+  return request;
+}
+
+/**
+ * Generate success message after request creation
+ */
+function generateSuccessMessage(category, extractedInfo, request) {
+  const messages = {
+    blood_request: `✅ **Blood Request Created Successfully!**\n\nYour request for ${extractedInfo.bloodType} blood has been submitted.\n\n**Details:**\n• Blood Type: ${extractedInfo.bloodType}\n• Units: ${extractedInfo.unitsNeeded || 1}\n• Hospital: ${extractedInfo.hospitalName || 'To be specified'}\n• Request ID: ${request._id}\n\nVolunteers and donors will be notified immediately. You should receive responses soon!`,
+
+    elder_support: `✅ **Elder Support Request Created!**\n\nYour request for elder support has been submitted.\n\n**Details:**\n• Service: ${extractedInfo.serviceType || 'Support needed'}\n• Request ID: ${request._id}\n\nVolunteers in your area will be notified and can accept your request.`,
+
+    complaint: `✅ **Complaint Registered Successfully!**\n\nYour complaint has been filed.\n\n**Details:**\n• Category: ${extractedInfo.complaintCategory || 'General'}\n• Request ID: ${request._id}\n\nThe appropriate department will review your complaint and take action.`
+  };
+
+  return messages[category] || `✅ Request created successfully! Request ID: ${request._id}`;
+}
+
 // @route   POST /api/chatbot/translate
 // @desc    Translate text between languages
 // @access  Private
@@ -1044,10 +1642,6 @@ router.post('/translate', auth, async (req, res) => {
         message: 'Source and target languages are required'
       });
     }
-
-    console.log('Translation route: Processing translation request...');
-    console.log('Translation route: Text:', text);
-    console.log('Translation route: From:', fromLang, 'To:', toLang);
 
     const translationResult = await translationService.translateText(text, fromLang, toLang);
 
@@ -1097,7 +1691,6 @@ router.post('/detect-language', auth, async (req, res) => {
       });
     }
 
-    console.log('Language detection route: Processing text:', text);
 
     const detectionResult = await translationService.detectLanguage(text);
 
@@ -1125,6 +1718,63 @@ router.post('/detect-language', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error processing language detection request',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/chatbot/history
+ * Fetch chat history for the authenticated user
+ */
+router.get('/history', auth, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = parseInt(req.query.skip) || 0;
+
+    const chats = await Chat.find({ user: req.user.userId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip(skip)
+      .lean();
+
+    // Reverse to show oldest first, then expand each chat into user + bot messages
+    const formattedMessages = [];
+    chats.reverse().forEach(chat => {
+      // Add user message
+      formattedMessages.push({
+        id: `${chat._id}-user`,
+        text: chat.message,
+        sender: 'user',
+        timestamp: chat.createdAt,
+        type: 'text'
+      });
+
+      // Add bot response
+      formattedMessages.push({
+        id: `${chat._id}-bot`,
+        text: chat.response,
+        sender: 'bot',
+        timestamp: chat.createdAt,
+        type: chat.category || 'text',
+        metadata: {
+          category: chat.category,
+          priority: chat.priority,
+          createdRequest: chat.createdRequest
+        }
+      });
+    });
+
+    res.json({
+      success: true,
+      messages: formattedMessages,
+      total: await Chat.countDocuments({ user: req.user.userId })
+    });
+  } catch (error) {
+    console.error('Error fetching chat history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching chat history',
       error: error.message
     });
   }

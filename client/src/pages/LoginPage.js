@@ -19,16 +19,12 @@ const LoginPage = () => {
 
   // If already authenticated, redirect based on user role
   if (isAuthenticated && user && user.role) {
-    console.log('User authenticated, role:', user?.role);
 
     if (user?.role === 'volunteer') {
-      console.log('Redirecting volunteer to volunteer dashboard');
       return <Navigate to="/volunteer-dashboard" replace />;
     } else if (user?.role === 'admin') {
-      console.log('Redirecting admin to admin dashboard');
       return <Navigate to="/admin" replace />;
     } else {
-      console.log('Redirecting citizen to user dashboard');
       return <Navigate to="/dashboard" replace />;
     }
   }
@@ -51,10 +47,7 @@ const LoginPage = () => {
     setIsSubmitting(true);
 
     try {
-      console.log('Attempting login with:', formData.email);
       const result = await login(formData);
-      console.log('Login result:', result);
-
       if (result && result.success) {
         // Show success message inline
         setStatusMessage({
@@ -199,11 +192,10 @@ const LoginPage = () => {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`p-4 rounded-lg text-center font-medium ${
-                statusMessage.type === 'success'
+              className={`p-4 rounded-lg text-center font-medium ${statusMessage.type === 'success'
                   ? 'bg-green-500/20 text-green-300 border border-green-500/30'
                   : 'bg-red-500/20 text-red-300 border border-red-500/30'
-              }`}
+                }`}
             >
               {statusMessage.type === 'success' && (
                 <div className="flex items-center justify-center space-x-2">

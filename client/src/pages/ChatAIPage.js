@@ -19,20 +19,68 @@ const ChatAIPage = () => {
   const navigate = useNavigate();
 
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      text: 'Welcome to SevaLink AI Assistant! 🤖\n\nI can help you with:\n• Blood donation requests\n• Elder support services\n• Filing complaints\n• General inquiries\n\nYou can type your message or use voice recording in English, Hindi, or Telugu.',
-      sender: 'bot',
-      timestamp: new Date(),
-      type: 'welcome'
-    }
-  ]);
+  const [messages, setMessages] = useState([]); // Start empty, will load from history or show welcome
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [conversationContext, setConversationContext] = useState({});
 
 
   const messagesEndRef = useRef(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  // Load chat history on component mount
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      if (!isAuthenticated || historyLoaded) return;
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:5000/api/chatbot/history', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          if (data.success && data.messages.length > 0) {
+            // Load existing history - convert timestamp strings to Date objects
+            const messagesWithDates = data.messages.map(msg => ({
+              ...msg,
+              timestamp: new Date(msg.timestamp)
+            }));
+            setMessages(messagesWithDates);
+          } else {
+            // No history, show welcome message
+            setMessages([{
+              id: 1,
+              text: 'Welcome to SevaLink AI Assistant! 🤖\n\nI can help you with:\n• Blood donation requests\n• Elder support services\n• Filing complaints\n• General inquiries\n\nYou can type your message or use voice recording in English, Hindi, or Telugu.',
+              sender: 'bot',
+              timestamp: new Date(),
+              type: 'welcome'
+            }]);
+          }
+          setHistoryLoaded(true);
+        } else {
+          console.error('❌ History fetch failed:', response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error('❌ Error loading chat history:', error);
+        // Show welcome message on error
+        setMessages([{
+          id: 1,
+          text: 'Welcome to SevaLink AI Assistant! 🤖\n\nI can help you with:\n• Blood donation requests\n• Elder support services\n• Filing complaints\n• General inquiries\n\nYou can type your message or use voice recording in English, Hindi, or Telugu.',
+          sender: 'bot',
+          timestamp: new Date(),
+          type: 'welcome'
+        }]);
+        setHistoryLoaded(true);
+      }
+    };
+
+    loadChatHistory();
+  }, [isAuthenticated, historyLoaded]);
 
   // Scroll to bottom when new messages are added
   useEffect(() => {
@@ -99,42 +147,54 @@ const ChatAIPage = () => {
     try {
       // Check authentication before sending
       const token = localStorage.getItem('token');
-      console.log('ChatAI: Sending message, token exists:', !!token);
-      console.log('ChatAI: User authenticated:', isAuthenticated);
 
       if (!token || !isAuthenticated) {
         throw new Error('AUTHENTICATION_REQUIRED');
       }
 
-      console.log('ChatAI: Calling voiceService.sendTextMessage with:', userMessage.text);
-      const result = await voiceService.sendTextMessage(userMessage.text);
-      console.log('ChatAI: Received result:', result);
+      const result = await voiceService.sendTextMessage(userMessage.text, 'en', conversationContext);
 
       // Remove typing indicator
       setMessages(prev => prev.filter(msg => msg.type !== 'typing'));
 
       if (result.success) {
-        // Prefer server-provided message if present (Gemini or fallback)
-        const responseText = result.data.geminiResponse ||
-          `Thank you for your message! I've received your ${result.data.category} request with ${result.data.priority} priority. Your request has been saved and will be reviewed by our volunteers soon.`;
+        // Update conversation context with extracted info
+        if (result.data.extractedInfo) {
+          setConversationContext(result.data.extractedInfo);
+        }
+
+        let responseText = '';
+        let messageType = 'success';
+
+        // If needs more info, show the follow-up question
+        if (result.data.needsMoreInfo) {
+          responseText = result.data.geminiResponse;
+          messageType = 'question';
+          toast('Please provide more details', { icon: '❓' });
+        } else if (result.data.createdRequestId) {
+          // Request was created successfully
+          responseText = result.data.geminiResponse;
+          messageType = 'success';
+          // Clear conversation context after successful request creation
+          setConversationContext({});
+          toast.success('Request created successfully!');
+        } else {
+          // General inquiry
+          responseText = result.data.geminiResponse || 'How can I help you today?';
+          messageType = 'info';
+          toast.success('Message processed');
+        }
 
         const botResponse = {
           id: Date.now() + 1,
           text: responseText,
           sender: 'bot',
           timestamp: new Date(),
-          type: 'success',
+          type: messageType,
           data: result.data
         };
 
         setMessages(prev => [...prev, botResponse]);
-
-        // Show appropriate success message
-        if (result.data.usingFallback) {
-          toast.success('Request processed successfully! (Basic mode - add Gemini API key for AI features)');
-        } else {
-          toast.success('Request processed with AI assistance!');
-        }
       } else {
         throw new Error(result.error);
       }
@@ -189,17 +249,12 @@ const ChatAIPage = () => {
     try {
       // Check authentication before sending
       const token = localStorage.getItem('token');
-      console.log('ChatAI Voice: Token exists:', !!token);
-      console.log('ChatAI Voice: User authenticated:', isAuthenticated);
-      console.log('ChatAI Voice: User object:', user);
 
       if (!token || !isAuthenticated || !user) {
         throw new Error('AUTHENTICATION_REQUIRED');
       }
 
-      console.log('ChatAI Voice: Calling voiceService.uploadAudio...');
       const result = await voiceService.uploadAudio(formData);
-      console.log('ChatAI Voice: Upload result:', result);
 
       // Remove processing message
       setMessages(prev => prev.filter(msg => msg.type !== 'processing'));
@@ -284,9 +339,9 @@ const ChatAIPage = () => {
 
     // Build bot response exactly like text input flow
     const categoryDisplay = transcriptionData.category === 'blood_request' ? 'Blood Request' :
-                           transcriptionData.category === 'elder_support' ? 'Elder Support' :
-                           transcriptionData.category === 'complaint' ? 'Complaint' :
-                           (transcriptionData.category || '').replace('_', ' ').toUpperCase();
+      transcriptionData.category === 'elder_support' ? 'Elder Support' :
+        transcriptionData.category === 'complaint' ? 'Complaint' :
+          (transcriptionData.category || '').replace('_', ' ').toUpperCase();
 
     const responseText = transcriptionData.geminiResponse ||
       `Thank you for your message! I've received your ${transcriptionData.category} request with ${transcriptionData.priority} priority. Your request has been saved and will be reviewed by our volunteers soon.`;
@@ -387,7 +442,7 @@ const ChatAIPage = () => {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 relative messages-container pb-4 max-h-[calc(100vh-200px)]">
         {/* Custom Scrollbar Styling */}
-        <style jsx>{`
+        <style>{`
           .messages-container::-webkit-scrollbar {
             width: 6px;
           }
@@ -417,17 +472,16 @@ const ChatAIPage = () => {
             className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-2xl px-5 py-3 rounded-xl border ${
-                msg.sender === 'user'
-                  ? 'bg-blue-600 text-white border-blue-500/50'
-                  : msg.type === 'error'
+              className={`max-w-2xl px-5 py-3 rounded-xl border ${msg.sender === 'user'
+                ? 'bg-blue-600 text-white border-blue-500/50'
+                : msg.type === 'error'
                   ? 'bg-red-800/90 text-red-100 border-red-600/50'
                   : msg.type === 'success' || msg.type === 'voice_success'
-                  ? 'bg-green-800/90 text-green-100 border-green-600/50'
-                  : msg.type === 'processing' || msg.type === 'typing'
-                  ? 'bg-blue-800/90 text-blue-100 border-blue-600/50'
-                  : 'bg-gray-700/90 text-gray-100 border-gray-600/50'
-              }`}
+                    ? 'bg-green-800/90 text-green-100 border-green-600/50'
+                    : msg.type === 'processing' || msg.type === 'typing'
+                      ? 'bg-blue-800/90 text-blue-100 border-blue-600/50'
+                      : 'bg-gray-700/90 text-gray-100 border-gray-600/50'
+                }`}
             >
               {msg.sender === 'bot' && (
                 <div className="flex items-center space-x-2 mb-2">
@@ -513,8 +567,6 @@ const ChatAIPage = () => {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleSendMessage()}
-              onFocus={(e) => console.log('Input focused')}
-              onClick={(e) => console.log('Input clicked')}
               placeholder="Type your message here..."
               disabled={isProcessing}
               className="w-full px-4 py-3 bg-gray-700/80 border border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-700/30 disabled:cursor-not-allowed text-white placeholder-gray-400 transition-all duration-200 cursor-text chat-input-glow"
@@ -526,11 +578,10 @@ const ChatAIPage = () => {
           <button
             onClick={toggleVoiceRecorder}
             disabled={isProcessing}
-            className={`p-3 rounded-lg border transition-all duration-200 hover:scale-105 active:scale-95 ${
-              showVoiceRecorder
-                ? 'text-purple-400 bg-purple-900/50 border-purple-500/50 shadow-lg shadow-purple-500/20'
-                : 'text-gray-400 hover:text-purple-400 hover:bg-gray-700/50 border-gray-600/50 hover:border-purple-500/30'
-            } disabled:text-gray-600 disabled:cursor-not-allowed disabled:hover:scale-100`}
+            className={`p-3 rounded-lg border transition-all duration-200 hover:scale-105 active:scale-95 ${showVoiceRecorder
+              ? 'text-purple-400 bg-purple-900/50 border-purple-500/50 shadow-lg shadow-purple-500/20'
+              : 'text-gray-400 hover:text-purple-400 hover:bg-gray-700/50 border-gray-600/50 hover:border-purple-500/30'
+              } disabled:text-gray-600 disabled:cursor-not-allowed disabled:hover:scale-100`}
             title={showVoiceRecorder ? 'Hide voice recorder' : 'Show voice recorder'}
           >
             <MicrophoneIcon className="w-5 h-5" />

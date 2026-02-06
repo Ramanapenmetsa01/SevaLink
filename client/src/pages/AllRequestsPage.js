@@ -100,29 +100,31 @@ const AllRequestsPage = () => {
 
   const getTypeColor = (type) => {
     const colors = {
-      blood: 'bg-red-100 text-red-600',
-      elder_support: 'bg-green-100 text-green-600',
-      complaint: 'bg-orange-100 text-orange-600'
+      blood: 'bg-red-500/30 text-red-300 border border-red-400/50',
+      elder_support: 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/50',
+      complaint: 'bg-amber-500/30 text-amber-300 border border-amber-400/50'
     };
-    return colors[type] || 'bg-gray-100 text-gray-600';
+    return colors[type] || 'bg-gray-500/30 text-gray-300 border border-gray-400/50';
   };
 
   const getStatusColor = (status) => {
     const colors = {
-      pending: 'text-yellow-400',
-      accepted: 'text-green-400'
+      pending: 'bg-yellow-500/20 text-yellow-300 border border-yellow-400/50',
+      accepted: 'bg-green-500/20 text-green-300 border border-green-400/50',
+      in_progress: 'bg-blue-500/20 text-blue-300 border border-blue-400/50',
+      completed: 'bg-purple-500/20 text-purple-300 border border-purple-400/50'
     };
-    return colors[status] || 'text-gray-400';
+    return colors[status] || 'bg-gray-500/20 text-gray-300 border border-gray-400/50';
   };
 
   const getUrgencyColor = (urgency) => {
     const colors = {
-      low: 'text-green-600',
-      medium: 'text-yellow-600',
-      high: 'text-orange-600',
-      urgent: 'text-red-600'
+      low: 'text-emerald-400',
+      medium: 'text-amber-400',
+      high: 'text-orange-400',
+      urgent: 'text-red-400'
     };
-    return colors[urgency] || 'text-gray-600';
+    return colors[urgency] || 'text-gray-400';
   };
 
   const formatDate = (dateString) => {
@@ -279,9 +281,9 @@ const AllRequestsPage = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="flex flex-col items-end space-y-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(request.status)}`}>
               {request.status.replace('_', ' ').toUpperCase()}
             </span>
           </div>
@@ -302,16 +304,7 @@ const AllRequestsPage = () => {
                 className="p-2 text-gray-400 hover:text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors"
                 title="View Donors"
               >
-                <EyeIcon className="w-4 h-4" />
-              </button>
-            )}
-            {request.status === 'pending' && (
-              <button
-                onClick={() => {/* Edit request */}}
-                className="p-2 text-gray-400 hover:text-green-400 hover:bg-green-500/20 rounded-lg transition-colors"
-                title="Edit Request"
-              >
-                <PencilIcon className="w-4 h-4" />
+                <EyeIcon className="w-5 h-5" />
               </button>
             )}
             <button
@@ -319,7 +312,7 @@ const AllRequestsPage = () => {
               className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
               title="Delete Request"
             >
-              <TrashIcon className="w-4 h-4" />
+              <TrashIcon className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -329,82 +322,82 @@ const AllRequestsPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto w-full space-y-8">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex justify-between items-center"
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-between items-center"
+      >
+        <div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
+            My Requests
+          </h1>
+          <p className="text-gray-300">Track and manage all your requests</p>
+        </div>
+
+        <button
+          onClick={() => navigate('/dashboard/add-request')}
+          className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 transition-all duration-300 shadow-lg"
         >
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
-              My Requests
-            </h1>
-            <p className="text-gray-300">Track and manage all your requests</p>
-          </div>
+          <PlusIcon className="w-5 h-5" />
+          <span>New Request</span>
+        </button>
+      </motion.div>
+
+      {/* Filters */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl border border-white/20 p-6"
+      >
+        <div className="flex items-center space-x-2 mb-4">
+          <FunnelIcon className="w-5 h-5 text-gray-300" />
+          <h3 className="text-lg font-semibold text-white">Filters</h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <select
+            value={filters.type}
+            onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+            className="bg-white/20 border border-white/30 rounded-lg px-3 py-2 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="" className="text-gray-900">All Types</option>
+            <option value="blood" className="text-gray-900">Blood Request</option>
+            <option value="elder_support" className="text-gray-900">Elder Support</option>
+            <option value="complaint" className="text-gray-900">Complaint</option>
+          </select>
+
+          <select
+            value={filters.status}
+            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+            className="bg-white/20 border border-white/30 rounded-lg px-3 py-2 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="" className="text-gray-900">All Status</option>
+            <option value="pending" className="text-gray-900">Pending</option>
+            <option value="in_progress" className="text-gray-900">In Progress</option>
+            <option value="resolved" className="text-gray-900">Resolved</option>
+            <option value="completed" className="text-gray-900">Completed</option>
+          </select>
+
+          <select
+            value={filters.sortBy}
+            onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+            className="bg-white/20 border border-white/30 rounded-lg px-3 py-2 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="newest" className="text-gray-900">Newest First</option>
+            <option value="oldest" className="text-gray-900">Oldest First</option>
+            <option value="updated" className="text-gray-900">Recently Updated</option>
+          </select>
 
           <button
-            onClick={() => navigate('/dashboard/add-request')}
-            className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 transition-all duration-300 shadow-lg"
+            onClick={() => setFilters({ type: '', status: '', sortBy: 'newest' })}
+            className="px-4 py-2 border border-white/30 text-white rounded-lg hover:bg-white/20 transition-colors"
           >
-            <PlusIcon className="w-5 h-5" />
-            <span>New Request</span>
+            Clear Filters
           </button>
-        </motion.div>
-
-        {/* Filters */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl border border-white/20 p-6"
-        >
-          <div className="flex items-center space-x-2 mb-4">
-            <FunnelIcon className="w-5 h-5 text-gray-300" />
-            <h3 className="text-lg font-semibold text-white">Filters</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <select
-              value={filters.type}
-              onChange={(e) => setFilters({...filters, type: e.target.value})}
-              className="bg-white/20 border border-white/30 rounded-lg px-3 py-2 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="" className="text-gray-900">All Types</option>
-              <option value="blood" className="text-gray-900">Blood Request</option>
-              <option value="elder_support" className="text-gray-900">Elder Support</option>
-              <option value="complaint" className="text-gray-900">Complaint</option>
-            </select>
-
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters({...filters, status: e.target.value})}
-              className="bg-white/20 border border-white/30 rounded-lg px-3 py-2 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="" className="text-gray-900">All Status</option>
-              <option value="pending" className="text-gray-900">Pending</option>
-              <option value="in_progress" className="text-gray-900">In Progress</option>
-              <option value="resolved" className="text-gray-900">Resolved</option>
-              <option value="completed" className="text-gray-900">Completed</option>
-            </select>
-
-            <select
-              value={filters.sortBy}
-              onChange={(e) => setFilters({...filters, sortBy: e.target.value})}
-              className="bg-white/20 border border-white/30 rounded-lg px-3 py-2 text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="newest" className="text-gray-900">Newest First</option>
-              <option value="oldest" className="text-gray-900">Oldest First</option>
-              <option value="updated" className="text-gray-900">Recently Updated</option>
-            </select>
-
-            <button
-              onClick={() => setFilters({ type: '', status: '', sortBy: 'newest' })}
-              className="px-4 py-2 border border-white/30 text-white rounded-lg hover:bg-white/20 transition-colors"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </motion.div>
+        </div>
+      </motion.div>
 
       {/* Requests Grid */}
       {loading ? (
@@ -426,46 +419,46 @@ const AllRequestsPage = () => {
         </motion.div>
       )}
 
-        {!loading && requests.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-12"
+      {!loading && requests.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center py-12"
+        >
+          <ClipboardDocumentListIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">No requests found</h3>
+          <p className="text-gray-300 mb-6">
+            {Object.values(filters).some(f => f)
+              ? "No requests match your current filters."
+              : "You haven't created any requests yet."
+            }
+          </p>
+          <button
+            onClick={() => navigate('/dashboard/add-request')}
+            className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 transition-all duration-300"
           >
-            <ClipboardDocumentListIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">No requests found</h3>
-            <p className="text-gray-300 mb-6">
-              {Object.values(filters).some(f => f)
-                ? "No requests match your current filters."
-                : "You haven't created any requests yet."
-              }
-            </p>
-            <button
-              onClick={() => navigate('/dashboard/add-request')}
-              className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 transition-all duration-300"
-            >
-              Create Your First Request
-            </button>
-          </motion.div>
-        )}
+            Create Your First Request
+          </button>
+        </motion.div>
+      )}
 
-        {/* Pagination */}
-        {!loading && requests.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="mt-8"
-          >
-            <Pagination
-              currentPage={pagination.current}
-              totalPages={pagination.total}
-              totalItems={pagination.totalRequests}
-              itemsPerPage={pagination.limit}
-              onPageChange={handlePageChange}
-            />
-          </motion.div>
-        )}
+      {/* Pagination */}
+      {!loading && requests.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="mt-8"
+        >
+          <Pagination
+            currentPage={pagination.current}
+            totalPages={pagination.total}
+            totalItems={pagination.totalRequests}
+            itemsPerPage={pagination.limit}
+            onPageChange={handlePageChange}
+          />
+        </motion.div>
+      )}
 
       {/* Donors Modal */}
       <AnimatePresence>
@@ -577,12 +570,11 @@ const AllRequestsPage = () => {
                                 <PhoneIcon className="w-4 h-4 text-gray-400" />
                                 <span className="text-white">{accepter.user.phone}</span>
                               </div>
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                accepter.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${accepter.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
                                 accepter.status === 'confirmed' ? 'bg-green-500/20 text-green-400' :
-                                accepter.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
-                                'bg-red-500/20 text-red-400'
-                              }`}>
+                                  accepter.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
+                                    'bg-red-500/20 text-red-400'
+                                }`}>
                                 {accepter.status.toUpperCase()}
                               </span>
                             </div>

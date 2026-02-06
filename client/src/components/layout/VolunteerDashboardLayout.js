@@ -9,7 +9,6 @@ import {
   UserIcon,
   HeartIcon,
   CheckCircleIcon,
-  BellIcon,
   ChevronDownIcon,
   Bars3Icon,
   XMarkIcon
@@ -83,16 +82,8 @@ const VolunteerDashboardLayout = () => {
             </div>
           </div>
 
-          {/* Right side - Notifications and Profile */}
+          {/* Right side - Profile */}
           <div className="flex items-center space-x-4">
-            {/* Notifications */}
-            <button className="relative p-2 rounded-lg hover:bg-white/10 transition-colors">
-              <BellIcon className="w-6 h-6 text-gray-300" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                3
-              </span>
-            </button>
-
             {/* Profile Dropdown */}
             <div className="relative">
               <button

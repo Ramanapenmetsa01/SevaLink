@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
 const path = require('path');
 
@@ -13,27 +13,20 @@ class GeminiVoiceService {
     this.quotaResetTime = null;
 
     if (!this.useGeminiAPI) {
-      console.log('🚫 GeminiVoiceService: Gemini API disabled via USE_GEMINI_API=false - using fallback mode only');
       this.geminiAvailable = false;
     } else if (!this.apiKey || this.apiKey === 'your-actual-gemini-api-key-here') {
-      console.warn('GEMINI_API_KEY not configured - using fallback mode');
-      console.log('To enable Gemini: Get API key from https://makersuite.google.com/app/apikey');
       this.geminiAvailable = false;
     } else {
       try {
-        this.genAI = new GoogleGenerativeAI(this.apiKey);
-        // Use the new model name - gemini-1.5-flash is the current free model
-        this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        this.client = new GoogleGenAI({ apiKey: this.apiKey });
+        // Use the stable 2.0 flash model
+        this.modelName = 'gemini-2.0-flash';
         this.geminiAvailable = true;
-        console.log('GeminiVoiceService: Initialized with Gemini 1.5 Flash');
       } catch (error) {
-        console.error('GeminiVoiceService: Failed to initialize Gemini:', error.message);
+        console.error('❌ GeminiVoiceService: Initialization error:', error);
         this.geminiAvailable = false;
       }
     }
-
-    console.log('GeminiVoiceService: Gemini available:', this.geminiAvailable);
-    console.log('GeminiVoiceService: Voice responses enabled:', this.enableVoiceResponses);
 
     // Reset quota status on initialization (fresh start)
     if (this.geminiAvailable) {
@@ -49,7 +42,6 @@ class GeminiVoiceService {
 
     // Check if it's been more than 24 hours since quota exceeded
     if (this.quotaExceededTime && Date.now() - this.quotaExceededTime > 24 * 60 * 60 * 1000) {
-      console.log('GeminiVoiceService: 24 hours passed, resetting quota status');
       this.quotaExceeded = false;
       this.quotaExceededTime = null;
       this.quotaResetTime = null;
@@ -64,7 +56,6 @@ class GeminiVoiceService {
    */
   markQuotaExceeded(retryDelay = null) {
     if (!this.quotaExceeded) {
-      console.log('🚫 GeminiVoiceService: Quota exceeded - switching to fallback mode for 24 hours');
       this.quotaExceeded = true;
       this.quotaExceededTime = Date.now();
 
@@ -72,7 +63,6 @@ class GeminiVoiceService {
         // Parse retry delay (e.g., "21s", "1h")
         const delay = this.parseRetryDelay(retryDelay);
         this.quotaResetTime = Date.now() + delay;
-        console.log(`GeminiVoiceService: Quota will reset in ${retryDelay}`);
       }
     }
   }
@@ -115,7 +105,6 @@ class GeminiVoiceService {
     this.quotaExceeded = false;
     this.quotaExceededTime = null;
     this.quotaResetTime = null;
-    console.log('✅ GeminiVoiceService: Quota status reset - ready to use Gemini API');
   }
 
   /**
@@ -125,9 +114,9 @@ class GeminiVoiceService {
   async transcribeAudio(audioBuffer, options = {}) {
     try {
       const { language = 'en' } = options;
-      
+
       console.log('GeminiVoiceService: Processing audio transcription...');
-      
+
       // For now, we'll use a mock transcription since Gemini Pro doesn't directly support audio
       // The actual transcription will happen on the frontend using Web Speech API
       const mockTranscriptions = {
@@ -137,7 +126,7 @@ class GeminiVoiceService {
       };
 
       const transcribedText = mockTranscriptions[language] || mockTranscriptions['en'];
-      
+
       return {
         success: true,
         text: transcribedText,
@@ -161,15 +150,8 @@ class GeminiVoiceService {
     try {
       const { userType = 'citizen', language = 'en', inputMethod = 'text' } = context;
 
-      console.log('GeminiVoiceService: Processing text...');
-      console.log('GeminiVoiceService: Input text:', text);
-      console.log('GeminiVoiceService: Gemini available:', this.geminiAvailable);
-
       // Check if quota is exceeded
       if (this.isQuotaExceeded()) {
-        const status = this.getQuotaStatus();
-        const hoursUntilReset = status.timeUntilReset ? Math.ceil(status.timeUntilReset / (1000 * 60 * 60)) : 24;
-        console.log(`🚫 GeminiVoiceService: Quota exceeded - using fallback mode (resets in ~${hoursUntilReset}h)`);
         const fallbackResponse = this.getFallbackResponse(text, context);
         return {
           success: true,
@@ -185,7 +167,6 @@ class GeminiVoiceService {
       }
 
       if (!this.geminiAvailable) {
-        console.log('GeminiVoiceService: Using fallback mode (no Gemini)');
         const fallbackResponse = this.getFallbackResponse(text, context);
         return {
           success: true,
@@ -203,11 +184,14 @@ class GeminiVoiceService {
       // Create a comprehensive prompt for Gemini
       const prompt = this.createGeminiPrompt(text, context);
 
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const generatedText = response.text();
+      const result = await this.client.models.generateContent({
+        model: this.modelName,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      });
 
-      console.log('GeminiVoiceService: Gemini response:', generatedText);
+      // Extract text from new response structure
+      const generatedText = result.response.candidates[0].content.parts[0].text;
+      console.log('🤖 Gemini raw response:', generatedText);
 
       // Parse the response to extract structured data
       const parsedResponse = this.parseGeminiResponse(generatedText, text);
@@ -240,7 +224,6 @@ class GeminiVoiceService {
         this.markQuotaExceeded(retryDelay);
       }
 
-      console.log('GeminiVoiceService: Falling back to basic processing');
       const fallbackResponse = this.getFallbackResponse(text, context);
       return {
         success: true,
@@ -262,7 +245,7 @@ class GeminiVoiceService {
    */
   createGeminiPrompt(text, context) {
     const { language = 'en', userType = 'citizen' } = context;
-    
+
     const languageInstructions = {
       'en': 'Respond in English',
       'hi': 'Respond in Hindi (हिंदी)',
@@ -380,7 +363,7 @@ Language Examples:
     }
 
     // Complaint patterns (multi-language)
-    if (/complaint|problem|issue|broken|not working|damaged|fault|repair|fix|शिकायत|समस्या|खराब|टूटा|मरम्मत|ఫిర్యాదు|సమస్య|పాడైన|పని చేయడం లేదు|మరమ్మత్తు|street|light|road|water|electricity|garbage|sewage|drainage|pothole|noise|pollution|सड़क|बत्ती|पानी|बिजली|कचरा|రోడ్డు|లైట్|నీరు|కరెంట్|చెత్త/.test(lowerText)) {
+    if (/complaint|problem|issue|broken|not working|damaged|fault|repair|fix|शिकायत|समस्या|खराब|टूटा|मरम्मत|ఫిర్యాదు|సమస్య|పాడైన|పని చేయడం లేదు|మరమ్మత్తు|street|light|road|water|electricity|garbage|sewage|drainage|pothole|pot\s*hole|noise|pollution|सड़क|बत्ती|पानी|बिजली|कचरा|రోడ్డు|లైట్|నీరు|కరెంట్|చెత్త/.test(lowerText)) {
       return 'complaint';
     }
 
@@ -392,11 +375,11 @@ Language Examples:
    */
   fallbackPriority(text) {
     const lowerText = text.toLowerCase();
-    
+
     if (/emergency|urgent|critical|आपातकाल|तुरंत|అత్యవసరం/.test(lowerText)) return 'urgent';
     if (/important|asap|soon|जल्दी|త్వరగా/.test(lowerText)) return 'high';
     if (/whenever|no rush|जब समय हो|సమయం ఉన్నప్పుడు/.test(lowerText)) return 'low';
-    
+
     return 'medium';
   }
 
@@ -449,7 +432,7 @@ Language Examples:
           base: 'Thank you for your blood donation request. ',
           bloodType: (bt) => `I understand you need ${bt} blood. `,
           urgent: 'I can see this is urgent. ',
-          end: `Your request has been categorized as a ${priority} priority blood request and will be shared with our volunteer donors immediately.`
+          end: `Your request has been categorized and blood request and will be shared with our volunteer donors immediately.`
         },
         'hi': {
           base: 'आपके रक्तदान अनुरोध के लिए धन्यवाद। ',
@@ -580,8 +563,8 @@ Language Examples:
   extractBloodTypeFromText(text) {
     console.log('🩸 Extracting blood type from text:', text);
 
-    // English patterns
-    const englishPattern = /\b(O\+|O-|A\+|A-|B\+|B-|AB\+|AB-|O\s*positive|O\s*negative|A\s*positive|A\s*negative|B\s*positive|B\s*negative|AB\s*positive|AB\s*negative|o\+|o-|a\+|a-|b\+|b-|ab\+|ab-|o\s*positive|o\s*negative|a\s*positive|a\s*negative|b\s*positive|b\s*negative|ab\s*positive|ab\s*negative)\b/i;
+    // English patterns - removed \b boundaries since + and - are not word characters
+    const englishPattern = /(O\+|O-|A\+|A-|B\+|B-|AB\+|AB-|O\s*positive|O\s*negative|A\s*positive|A\s*negative|B\s*positive|B\s*negative|AB\s*positive|AB\s*negative)/i;
     const englishMatch = text.match(englishPattern);
 
     if (englishMatch) {
@@ -599,7 +582,6 @@ Language Examples:
       const bloodGroupMap = { 'ए': 'A', 'बी': 'B', 'एबी': 'AB', 'ओ': 'O' };
       const bloodGroup = bloodGroupMap[hindiMatch[1]] || hindiMatch[1];
       const rh = (hindiMatch[2] === 'पॉजिटिव' || hindiMatch[2] === '+') ? '+' : '-';
-      console.log('🩸 Found Hindi blood type:', bloodGroup + rh);
       return bloodGroup + rh;
     }
 
@@ -611,7 +593,6 @@ Language Examples:
       const bloodGroupMap = { 'ఎ': 'A', 'బి': 'B', 'ఎబి': 'AB', 'ఓ': 'O' };
       const bloodGroup = bloodGroupMap[teluguMatch[1]] || teluguMatch[1];
       const rh = (teluguMatch[2] === 'పాజిటివ్' || teluguMatch[2] === '+') ? '+' : '-';
-      console.log('🩸 Found Telugu blood type:', bloodGroup + rh);
       return bloodGroup + rh;
     }
 
@@ -624,7 +605,6 @@ Language Examples:
       const bloodGroup = bloodGroupMap[altMatch[2]] || altMatch[2].toUpperCase();
       const rhFactor = altMatch[3].toLowerCase();
       const rh = (rhFactor === 'positive' || rhFactor === '+' || rhFactor === 'पॉजिटिव' || rhFactor === 'పాజిటివ్') ? '+' : '-';
-      console.log('🩸 Found alternative pattern blood type:', bloodGroup + rh);
       return bloodGroup + rh;
     }
 
@@ -649,11 +629,9 @@ Language Examples:
 
       rh = (match.includes('పాజిటివ్') || match.includes('पॉजिटिव')) ? '+' : '-';
 
-      console.log('🩸 Found flexible pattern blood type:', bloodGroup + rh);
       return bloodGroup + rh;
     }
 
-    console.log('🩸 No blood type found in text');
     return null;
   }
 
@@ -754,6 +732,265 @@ Language Examples:
         volume: 1.0
       }
     };
+  }
+
+  /**
+   * Use Gemini to intelligently extract information from user message
+   * This replaces hardcoded pattern matching with AI-powered understanding
+   */
+  async extractInformationWithGemini(text, category, language = 'en', conversationContext = {}) {
+    try {
+      if (!this.geminiAvailable || this.isQuotaExceeded()) {
+        return {
+          success: false,
+          usingFallback: true
+        };
+      }
+
+      const prompt = `
+You are an intelligent information extraction system for SevaLink, a community service platform.
+
+User's message: "${text}"
+Request category: ${category}
+Language: ${language}
+Previous context: ${JSON.stringify(conversationContext)}
+
+Your task is to extract structured information from the user's message based on the category.
+
+For BLOOD_REQUEST, extract:
+- bloodType: The blood group (A+, A-, B+, B-, O+, O-, AB+, AB-) - **REQUIRED**
+- unitsNeeded: Number of blood units needed (optional, can be added later)
+- hospitalName: Name of hospital or medical center (optional, can be added later)
+- patientName: Name of the patient (optional)
+- relationship: Relationship to patient (Self, Mother, Father, Brother, Sister, Friend, etc.) (optional)
+- urgencyLevel: ALWAYS extract this field! Look for keywords:
+  * "urgent", "emergency", "asap", "immediately", "critical" → set to "urgent"
+  * "medium", "normal", "regular", "moderate" → set to "medium"  
+  * "low", "not urgent", "can wait", "flexible" → set to "low"
+  * "soon", "needed", "required" → set to "high"
+  * If NO urgency keywords found → set to "high" (default)
+- requiredDate: When blood is needed (optional)
+- medicalCondition: Reason for blood need (optional)
+- location: City or area where blood is needed (optional)
+
+For ELDER_SUPPORT, extract:
+- serviceType: Type of service (Medical Care, Food & Nutrition, Personal Hygiene, Companionship, Other) - **REQUIRED**
+- elderName: Name of elderly person (optional)
+- age: Age of elderly person (optional)
+- supportType: Array of support types needed (optional)
+- frequency: daily, weekly, monthly, or one-time (optional)
+- timeSlot: preferred time (optional)
+- specialRequirements: Any special needs (optional)
+- location: Where the service is needed (optional)
+
+For COMPLAINT, extract:
+- complaintCategory: Road Maintenance, Water Supply, Waste Management, Electricity, Public Safety, Healthcare, Education, Transportation, Other - **REQUIRED**
+- complaintLocation: Where the issue is located (optional but recommended)
+- severity: high, medium, or low (optional)
+- description: Description of the problem (optional)
+
+IMPORTANT RULES:
+1. Only extract information that is EXPLICITLY mentioned in the user's message
+2. Do NOT make assumptions or fill in missing information
+3. If a **REQUIRED** field is not mentioned, mark it as null
+4. Be smart about understanding context - "I need blood" means blood_request category
+5. Understand natural language - "my mom needs O+ blood" should extract relationship: "Mother", bloodType: "O+"
+6. Support multiple languages - extract from Hindi/Telugu text too
+7. Be flexible with hospital names - "king" could mean "King Hospital", "hospital names king" means the hospital is called "king"
+8. Extract numbers intelligently - "10 units" means unitsNeeded: 10
+
+Respond in JSON format:
+{
+  "extractedInfo": {
+    // Only include fields that were found in the message
+  },
+  "missingRequired": ["field1", "field2"], // List ONLY of **REQUIRED** fields that are missing
+  "confidence": 0.95, // How confident you are in the extraction (0-1)
+  "needsMoreInfo": true/false // true ONLY if **REQUIRED** fields are missing
+}
+
+Example 1:
+User: "I need blood"
+Response: {
+  "extractedInfo": {},
+  "missingRequired": ["bloodType"],
+  "confidence": 0.9,
+  "needsMoreInfo": true
+}
+
+Example 2:
+User: "I need O+ blood"
+Response: {
+  "extractedInfo": {
+    "bloodType": "O+"
+  },
+  "missingRequired": [],
+  "confidence": 0.95,
+  "needsMoreInfo": false
+}
+
+Example 3:
+User: "I need A+ blood of 10 units for hospital names king"
+Response: {
+  "extractedInfo": {
+    "bloodType": "A+",
+    "unitsNeeded": 10,
+    "hospitalName": "King Hospital",
+    "urgencyLevel": "high"
+  },
+  "missingRequired": [],
+  "confidence": 0.9,
+  "needsMoreInfo": false
+}
+
+Example 4:
+User: "I urgently need O+ blood for emergency surgery"
+Response: {
+  "extractedInfo": {
+    "bloodType": "O+",
+    "urgencyLevel": "urgent",
+    "medicalCondition": "emergency surgery"
+  },
+  "missingRequired": [],
+  "confidence": 0.95,
+  "needsMoreInfo": false
+}
+
+Example 5:
+User: "I need A- blood with medium urgency"
+Response: {
+  "extractedInfo": {
+    "bloodType": "A-",
+    "urgencyLevel": "medium"
+  },
+  "missingRequired": [],
+  "confidence": 0.9,
+  "needsMoreInfo": false
+}
+
+Example 6:
+User: "I need O+ blood with low urgency"
+Response: {
+  "extractedInfo": {
+    "bloodType": "O+",
+    "urgencyLevel": "low"
+  },
+  "missingRequired": [],
+  "confidence": 0.9,
+  "needsMoreInfo": false
+}
+
+IMPORTANT: You MUST include urgencyLevel in extractedInfo for blood requests, even if not mentioned (use "high" as default).
+
+Now extract from the user's message above:`;
+
+      const result = await this.client.models.generateContent({
+        model: this.modelName,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      });
+
+      const generatedText = result.response.candidates[0].content.parts[0].text;
+
+      console.log('🤖 Gemini raw response for extraction:', generatedText);
+
+      // Parse JSON response
+      const jsonMatch = generatedText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        console.log('✅ Parsed extraction result:', JSON.stringify(parsed, null, 2));
+        console.log('⚡ Urgency in parsed result:', parsed.extractedInfo?.urgencyLevel || 'NOT FOUND');
+
+        return {
+          success: true,
+          extractedInfo: parsed.extractedInfo || {},
+          missingRequired: parsed.missingRequired || [],
+          confidence: parsed.confidence || 0.8,
+          needsMoreInfo: parsed.needsMoreInfo || false,
+          usingFallback: false
+        };
+      }
+
+      return {
+        success: false,
+        usingFallback: true
+      };
+
+    } catch (error) {
+      console.error('GeminiVoiceService: Information extraction error:', error);
+      return {
+        success: false,
+        usingFallback: true,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Use Gemini to generate intelligent follow-up questions
+   */
+  async generateFollowUpQuestion(category, missingField, extractedInfo, language = 'en') {
+    try {
+      if (!this.geminiAvailable || this.isQuotaExceeded()) {
+        return {
+          success: false,
+          usingFallback: true
+        };
+      }
+
+      const prompt = `
+You are a helpful AI assistant for SevaLink community services.
+
+The user is trying to create a ${category.replace('_', ' ')} request.
+
+Information already provided:
+${Object.keys(extractedInfo).length > 0 ? JSON.stringify(extractedInfo, null, 2) : 'Nothing yet'}
+
+Missing required information: ${missingField}
+
+Language: ${language}
+
+Generate a natural, friendly, conversational question to ask for the missing ${missingField}.
+
+RULES:
+1. Be warm and helpful, not robotic
+2. Don't repeat information they already gave
+3. Keep it short (1-2 sentences max)
+4. Respond in the user's language (${language})
+5. Make it feel like a natural conversation
+6. Be specific about what you need
+
+Examples:
+
+Missing bloodType:
+English: "I understand you need blood. What blood type is required? (For example: A+, B+, O+, AB+, A-, B-, O-, or AB-)"
+Hindi: "मैं समझता हूं कि आपको रक्त की आवश्यकता है। कौन सा रक्त समूह चाहिए? (उदाहरण: A+, B+, O+, AB+, A-, B-, O-, या AB-)"
+Telugu: "మీకు రక్తం అవసరమని నేను అర్థం చేసుకున్నాను। ఏ రక్త వర్గం అవసరం? (ఉదాహరణ: A+, B+, O+, AB+, A-, B-, O-, లేదా AB-)"
+
+Missing hospitalName (when bloodType is O+):
+English: "Got it, you need O+ blood. Which hospital or medical center should donors contact?"
+Hindi: "समझ गया, आपको O+ रक्त चाहिए। दाताओं को किस अस्पताल या चिकित्सा केंद्र से संपर्क करना चाहिए?"
+Telugu: "అర్థమైంది, మీకు O+ రక్తం కావాలి. దాతలు ఏ ఆసుపత్రి లేదా వైద్య కేంద్రాన్ని సంప్రదించాలి?"
+
+Now generate the follow-up question for the missing ${missingField}:`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const question = response.text().trim();
+
+      return {
+        success: true,
+        question: question,
+        usingFallback: false
+      };
+
+    } catch (error) {
+      console.error('GeminiVoiceService: Follow-up question generation error:', error);
+      return {
+        success: false,
+        usingFallback: true,
+        error: error.message
+      };
+    }
   }
 
   /**
